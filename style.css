@@ -55,40 +55,98 @@ body, html {
 /* ==========================================
    NAVIGATION
    ========================================== */
+/* ==========================================
+   NAVIGATION MASTER STRUCTURE
+   ========================================== */
 #nav {
     width: 100%;
-    padding: 30px 0; /* Slightly more breathing room */
     display: flex;
     justify-content: space-between;
-    align-items: center;
-}
-
-#nav img {
-    height: 50px; /* Standardized luxury brand logo size */
+    align-items: center; /* Perfect geometric vertical alignment across the header */
+    padding: 30px 40px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 100; /* Keeps nav anchored cleanly over fluid background canvases */
+    pointer-events: all;
 }
 
 #nleft, #nright {
     display: flex;
     align-items: center;
-    gap: 40px;
+    gap: 35px; /* Spaces links out beautifully */
 }
 
-#nleft a, #nright a {
+/* Nav Logo Micro-Sizing */
+#nleft img {
+    height: 50px; /* Keeps the Spotify asset compact and elegant */
+    width: auto;
+    object-fit: contain;
+    opacity: 0.95;
+    transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+#nleft img:hover {
+    transform: scale(1.05); /* Tiny reactive visual pulse */
+}
+
+/* ==========================================
+   EDITORIAL TEXT LINKS & HOVER STATES
+   ========================================== */
+#nav a {
     text-decoration: none;
+    color: rgba(255, 255, 255, 0.65); /* Faded silver white for base balance */
+    font-size: 11px;
+    font-weight: 700; /* Bumped weight slightly for better readability over green */
     text-transform: uppercase;
-    color: #fff;
-    font-family: "gilroy", sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    pointer-events: all; /* Restores link usage */
-    transition: opacity 0.3s ease; /* Premium hover effect */
+    letter-spacing: 2px;
+
+    position: relative;
+    padding: 8px 16px; /* Added breathing room inside the pill bounding box */
+    border-radius: 100px; /* Pre-rounds the capsule profile */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden; /* Clips the background slider perfectly to the pill boundaries */
+
+    transition: color 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-#nleft a:hover, #nright a:hover {
-    opacity: 0.6;
+/* Ensure link text stays layered above the incoming background fill */
+#nav a span {
+    position: relative;
+    z-index: 2;
 }
 
+/* The Sliding Capsule Background Fill Container */
+#nav a::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1DB954; /* Spotify Signature Green */
+    z-index: 1;
+
+    /* Starts completely scaled down from the center-left and slides/pops outward */
+    transform: scaleX(0);
+    transform-origin: left;
+    border-radius: 100px;
+
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.3, 1);
+}
+
+/* ==========================================
+   INTERACTIVE HOVER STATE CHANGES
+   ========================================== */
+#nav a:hover {
+    color: #000000; /* Snaps text to black so it punches out over the neon green fill */
+}
+
+#nav a:hover::before {
+    transform: scaleX(1); /* Expands the green pill background instantly */
+}
 /* ==========================================
    HERO INTERIOR LAYOUT
    ========================================== */
@@ -198,94 +256,162 @@ body, html {
 #heroright {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    width: 24%; /* Slightly wider for perfect internal breathing room */
+    width: 24%;
     color: #fff;
     height: auto;
-    min-height: 55vh;
+    min-height: 58vh;
     justify-content: space-between;
     pointer-events: all;
 
-    /* Modern Glassmorphic Foundation */
+    /* Modern Glassmorphic panel foundation */
     background: rgba(255, 255, 255, 0.02);
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
     border: 1px solid rgba(255, 255, 255, 0.06);
-    padding: 30px;
+    padding: 25px;
     border-radius: 20px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
-/* Editorial Style - Top Label Header */
+/* Header Text formatting */
 #heroright p:nth-child(1) {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     letter-spacing: 3px;
     text-transform: uppercase;
-    color: #1DB954; /* Spotify Neon Green Accent */
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: #1DB954; /* Spotify Accent Green */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     padding-bottom: 12px;
-    width: 100%; /* Forces the divider line to stretch full width */
+    width: 100%;
+    text-align: right;
 }
 
-/* Companion Image Card */
+/* Album Art Framing */
+/* Update the container to act as a physical bounding box for the stack */
 #heroright .imagediv {
     width: 100%;
-    height: 160px;
+    height: 180px;
     flex-shrink: 0;
-    background-image: url("images/portrait4.jpg");
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    margin: 20px 0;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-
-    /* Smooth hover interaction: moves from monochromatic to color */
-    filter: grayscale(40%) contrast(105%);
-    transition: filter 0.4s ease, transform 0.4s ease;
+    margin: 15px 0;
+    position: relative;
+    background: transparent; /* No longer need a single hardcoded image */
+    border: none;
 }
 
-#heroright:hover .imagediv {
-    filter: grayscale(0%) contrast(100%);
-    transform: scale(1.02);
+/* Individual Card Properties inside the deck pile */
+.album-card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+
+    /* Layer hierarchy positioning setups */
+    opacity: 0;
+    transform: scale(0.9) translateY(10px);
+    pointer-events: none;
+    z-index: 1;
 }
 
-/* Description Typography Layout */
-#heroright p {
-    font-size: 13px;
-    line-height: 1.6;
-    text-align: right;
-    font-weight: 300;
-    opacity: 0.7;
-    transition: opacity 0.3s ease;
-}
-
-#heroright:hover p {
-    opacity: 0.95;
+/* The active top-layer deck item styling rules */
+.album-card.active {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    pointer-events: auto;
+    z-index: 5;
 }
 
 /* ==========================================
-   VECTOR SVG PLAYER CONTROLS
+   TRACK METADATA TYPOGRAPHY
+   ========================================== */
+.player-meta {
+    width: 100%;
+    text-align: left; /* Switched to left align for an authentic music app feel */
+    margin-top: 5px;
+}
+
+.player-meta .track-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #ffffff;
+    margin: 0 0 4px 0;
+}
+
+.player-meta .artist-name {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.6) !important; /* Forces transparency down from base p styles */
+    margin: 0 !important;
+    text-align: left !important;
+}
+
+/* ==========================================
+   PLAYBACK TIMELINE / PROGRESS BAR
+   ========================================== */
+.playback-timeline {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.playback-timeline .time-stamp {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.4);
+    font-weight: 400;
+    min-width: 25px;
+}
+
+.playback-timeline .progress-bar-container {
+    flex-grow: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    transition: height 0.1s ease;
+}
+
+.playback-timeline .progress-bar-fill {
+    width: 25%; /* Simulated playback track placement */
+    height: 100%;
+    background-color: #ffffff; /* Default progress bar color */
+    border-radius: 10px;
+    transition: background-color 0.1s ease;
+}
+
+/* Hovering turns the track timeline green, just like Spotify */
+.progress-bar-container:hover {
+    height: 6px; /* Thickens up on mouse approach */
+}
+
+.progress-bar-container:hover .progress-bar-fill {
+    background-color: #1DB954;
+}
+
+/* ==========================================
+   MUSIC CONTROL BUTTON LAYOUT
    ========================================== */
 #heroright .player-controls {
     width: 100%;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 25px;
-    padding-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08); /* Minimalist divider above icons */
+    margin-top: 5px;
 }
 
-/* Clean structural resets for the SVG wrapper buttons */
 .control-btn {
     background: none;
     border: none;
     padding: 0;
-    width: 24px;
-    height: 24px;
-    color: #ffffff;
+    width: 28px;
+    height: 28px;
+    color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -296,48 +422,44 @@ body, html {
 .control-btn svg {
     width: 100%;
     height: 100%;
-    display: block;
 }
 
-/* Spotify Hover States */
-.control-btn:hover {
-    color: #1DB954;
-    transform: scale(1.12);
-}
-
-/* Kinetic Sound Wave Bars */
-.track-wave {
-    display: flex;
-    align-items: flex-end;
-    gap: 3px;
+/* Accentuate Shuffle and Repeat secondary status toggles */
+.secondary-btn {
+    width: 18px;
     height: 18px;
+    color: rgba(255, 255, 255, 0.4);
 }
 
-.track-wave span {
-    width: 2px;
-    height: 100%;
-    background-color: #1DB954; /* Active green sound streaming */
-    border-radius: 1px;
-    transform-origin: bottom;
-    animation: bounce 1.2s ease-in-out infinite alternate;
+/* The core central action button circle layout */
+.master-play {
+    width: 42px;
+    height: 42px;
+    background-color: #ffffff;
+    color: #000000;
+    border-radius: 50%;
+    padding: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* Audio simulation staggering modifiers */
-.track-wave span:nth-child(1) { animation-delay: 0.1s; height: 30%; }
-.track-wave span:nth-child(2) { animation-delay: 0.4s; height: 85%; }
-.track-wave span:nth-child(3) { animation-delay: 0.2s; height: 55%; }
-.track-wave span:nth-child(4) { animation-delay: 0.6s; height: 100%; }
-
-@keyframes bounce {
-    0% { transform: scaleY(0.3); }
-    100% { transform: scaleY(1.1); }
+/* Dynamic Interaction Hover Rules */
+.control-btn:hover {
+    color: #ffffff;
 }
-/* ==========================================
-   BOTTOM CENTER COLLABORATION TEXT
-   ========================================== */
-/* ==========================================
-   BOTTOM CENTER COLLABORATION LOGO
-   ========================================== */
+
+.secondary-btn:hover {
+    color: #1DB954;
+}
+
+.master-play:hover {
+    background-color: #1DB954; /* Snaps to Spotify brand color on master play hover */
+    color: #ffffff;
+    transform: scale(1.08);
+}
+
+.master-play:active {
+    transform: scale(0.95);
+}
 #footer-collab {
     position: absolute;
     bottom: 25px; /* Pinned neatly near the bottom edge */

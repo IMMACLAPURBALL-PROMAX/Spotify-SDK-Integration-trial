@@ -20,35 +20,34 @@
 
             <div id="nav">
                 <div id="nleft">
-                    <img src="images/Spotifylogo.png" alt="Rayban Logo"/>
-                    <a href="#">Soundscapes</a>
-                    <a href="#">Visuals</a>
+                    <img src="images/Spotifylogo.png" alt="Spotify Logo"/>
+                    <a href="#"><span>Soundscapes</span></a>
+                    <a href="#"><span>Visuals</span></a>
                 </div>
                 <div id="nright">
-                    <a href="#">Audio</a>
-                    <a href="#">Premium</a>
+                    <a href="#"><span>Audio</span></a>
+                    <a href="#"><span>Premium</span></a>
                 </div>
             </div>
-
             <div id="hero">
                 <div id="heroleft">
                     <div class="elem">
-                        <h1>billie eilish</h1>
-                        <h1>ocean eyes</h1>
-                        <h1>hit me hard</h1>
-                        <h1>happier than</h1>
-                        <h1>all the good</h1>
+                        <h1>No Time To Die</h1>
+                        <h1>CHIHIRO</h1>
+                        <h1>dont smile</h1>
+                        <h1>BURY A FRIEND</h1>
+                        <h1>Happier Than</h1>
                     </div>
                     <div class="elem">
-                        <h1>blame it on</h1>
-                        <h1>burning cities</h1>
-                        <h1>and soft</h1>
-                        <h1>ever before</h1>
-                        <h1>girls go to</h1>
+                        <h1>007 theme.</h1>
+                        <h1>ocean waves.</h1>
+                        <h1>at me.</h1>
+                        <h1>sleepwalk.</h1>
+                        <h1>Ever Before.</h1>
                     </div>
                     <div class="elem">
-                        <h1>my youth.</h1>
-                        <h1>napalm.</h1>
+                        <h1>orchestral.</h1>
+                        <h1>deep blue.</h1>
                         <h1>colors.</h1>
                         <h1>alone.</h1>
                         <h1>heaven.</h1>
@@ -61,34 +60,52 @@
                     </button>
                 </div>
                 <div id="heroright">
-                    <p>SPOTIFY X BILLIE EILISH</p>
-                    <div class="imagediv"></div>
-                    <p>Experience the visual soundscape of Hit Me Hard and Soft. Tap anywhere to sync the frequencies.</p>
+                    <p>NOW PLAYING</p>
 
-                    <!-- BRAND LOGOS / MUSIC CONTROLS ROW -->
+                    <!-- Dynamic Image Stack Container -->
+                    <div class="imagediv">
+                        <img src="images/cover1.jpg" class="album-card active" alt="No Time To Die" />
+                        <img src="images/cover2.jpg" class="album-card" alt="HIT ME HARD AND SOFT Era" />
+                        <img src="images/cover3.jpg" class="album-card" alt="dont smile at me Era" />
+                        <img src="images/cover4.jpg" class="album-card" alt="WHEN WE ALL FALL ASLEEP Era" />
+                        <img src="images/cover5.jpg" class="album-card" alt="Happier Than Ever" />
+                    </div>
+                    <!-- Track & Artist Typography -->
+                    <div class="player-meta">
+                        <h3 class="track-title">LUNCH</h3>
+                        <p class="artist-name">Billie Eilish</p>
+                    </div>
+
+                    <!-- Interactive Progress/Timeline Bar -->
+                    <div class="playback-timeline">
+                        <span class="time-stamp" id="current-time">0:00</span>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill"></div>
+                        </div>
+                        <span class="time-stamp" id="total-time">3:02</span>
+                    </div>
+
+                    <!-- Music Control Layout -->
                     <div class="player-controls">
-                        <!-- Play Button (SVG) -->
-                        <button class="control-btn play-btn" aria-label="Play Track">
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M8 5v14l11-7z"/>
-                            </svg>
+                        <button class="control-btn secondary-btn" aria-label="Shuffle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
                         </button>
 
-                        <!-- Animated Music Audio Wave Bars -->
-                        <div class="track-wave">
-                            <span></span>
-                            <span></span>
-                            <span></span>
-                            <span></span>
-                        </div>
+                        <!-- Click targets mapped for JavaScript control -->
+                        <button class="control-btn" id="prev-track" aria-label="Previous Track">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                        </button>
 
-                        <!-- Spotify Device/Connect Icon (SVG) -->
-                        <button class="control-btn device-btn" aria-label="Connect Device">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="4" y="4" width="16" height="12" rx="2"/>
-                                <line x1="12" y1="20" x2="12" y2="16"/>
-                                <line x1="8" y1="20" x2="16" y2="20"/>
-                            </svg>
+                        <button class="control-btn master-play" id="play-trigger" aria-label="Play Track">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
+
+                        <button class="control-btn" id="next-track" aria-label="Next Track">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6zm9-12h2v12h-2z"/></svg>
+                        </button>
+
+                        <button class="control-btn secondary-btn" aria-label="Repeat">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
                         </button>
                     </div>
                 </div>
