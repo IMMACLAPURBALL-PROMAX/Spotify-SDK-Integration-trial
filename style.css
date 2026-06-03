@@ -508,3 +508,104 @@ body, html {
     opacity: 0.9;
     transform: scale(1.02); /* Tiny visual pulse on hover */
 }
+
+/* ==========================================
+   MOBILE & TABLET RESPONSIVE OVERRIDES
+   ========================================== */
+@media screen and (max-width: 768px) {
+    /* 1. Reset Master Navigation Padding */
+    #nav {
+        padding: 15px 20px;
+        gap: 15px;
+    }
+
+    #nleft, #nright {
+        gap: 12px;
+    }
+
+    #nav a {
+        font-size: 9px;
+        padding: 6px 10px;
+        letter-spacing: 1px;
+    }
+
+    #nleft img {
+        height: 18px; /* Slightly shrink Spotify mark */
+    }
+
+    /* 2. Re-architect Split Panels into a Centered Column Stack */
+    #heroleft, #heroright {
+        width: 100% !important;
+        position: relative;
+        left: 0 !important;
+        transform: none !important;
+    }
+
+    /* Bounding layout for mobile content */
+    #main {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        padding: 80px 20px 40px 20px; /* Give room for fixed top nav */
+        overflow-y: auto; /* Allow scrolling within the application view container if needed */
+        height: 100vh;
+    }
+
+    /* 3. Compress Large Left Typography Heading Block */
+    #heroleft {
+        text-align: center;
+        margin-bottom: 30px;
+        align-items: center;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .elem {
+        height: 40px; /* Snug height match for smaller text sizes */
+        overflow: hidden;
+    }
+
+    .elem h1 {
+        font-size: 1.8rem !important; /* Scale down the massive font footprint */
+        line-height: 40px;
+    }
+
+    #heroleft button {
+        padding: 10px 24px;
+        font-size: 11px;
+        margin-top: 15px;
+    }
+
+    /* 4. Transform Right Player Card to Fluid Mobile Widget Width */
+    #heroright {
+        width: 100% !important;
+        max-width: 360px; /* Keeps the card looking like a tight widget on mobile screens */
+        min-height: auto;
+        padding: 18px;
+        margin: 0 auto;
+    }
+
+    #heroright .imagediv {
+        height: 140px; /* Slightly compress image depth footprint */
+        margin: 10px 0;
+    }
+
+    .player-meta .track-title {
+        font-size: 1.1rem;
+    }
+
+    /* 5. Fine-Tune Bottom Center Signature Logo Position */
+    #footer-collab {
+        position: relative;
+        bottom: 0;
+        left: 0;
+        transform: none;
+        margin-top: 40px;
+        width: 100%;
+    }
+
+    #footer-collab .collab-logo {
+        height: 28px; /* Scale down script size for mobile display aesthetics */
+    }
+}
