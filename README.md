@@ -1,25 +1,36 @@
-# Spotify × Billie Eilish — Interactive Soundscapes Concept
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-An immersive, full-screen audio-visual web dashboard exploring a premium editorial collaboration concept between Spotify and Billie Eilish. This project breaks away from traditional static scrolling layouts to deliver an experience that feels less like a website and more like a native, high-end media application.
+## Getting Started
 
-## 🌟 Key Features
+First, run the development server:
 
-* **Synchronized State Engine:** A single global index coordinates and drives the entire viewport. One click seamlessly updates the WebGL backdrop, shifts the typography layers, and swaps the music metadata simultaneously.
-* **Interactive Album Card Deck:** Features a physical "vinyl deck" layout with layered CSS structures. Powered by GSAP, advancing a track triggers a multi-axis 3D fly-away animation revealing the next cover art underneath.
-* **Premium Spotify Micro-Interactions:** Modern app-like capsule pill hover effects on navigation links and calls-to-action that dynamically expand background layers while flipping text contrast for optimal readability.
-* **Fluid WebGL Backdrop:** Fragment shaders and liquid distortion rendering engines that track pointer movements to generate interactive visual depth across slide transitions.
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
 
-## 🛠️ Tech Stack
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-* **Structure:** Semantic HTML5 & Flexbox Architecture
-* **Styling:** Custom CSS3 (Glassmorphism properties, pseudo-element canvas layers)
-* **Animation & Motion:** GSAP (GreenSock Animation Platform) using customized `expo.inOut` easing curves
-* **WebGL Shaders:** Shery.js (Three.js abstraction layer) for interactive fluid distortion uniforms
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-## 💻 Architecture Highlights
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-* **Anti-Spam State Locks:** Integrated global timeline locks (`animating = true`) to prevent rapid click spamming from breaking asynchronous visual queues.
-* **Propagation Barriers:** Utilizes defensive event bubbling management (`event.stopPropagation()`) to completely isolate music player controller interactions from general page sliding loops.
+## Learn More
 
----
-*Created as a front-end engineering and creative technology case study.*
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
