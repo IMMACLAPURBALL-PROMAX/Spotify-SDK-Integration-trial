@@ -5,11 +5,38 @@ import Script from "next/script";
 import * as THREE from "three";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import {
+  redirectToSpotifyLogin,
+  getStoredAccessToken,
+  clearSpotifyAuth,
+} from "@/lib/spotify-auth";
 
 export default function Home() {
   const [scriptsLoaded, setScriptsLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Check for existing token on mount
+  useEffect(() => {
+    const token = getStoredAccessToken();
+    if (token) {
+      setIsLoggedIn(true);
+      console.log("[Spotify] Already logged in. Token:", token.slice(0, 20) + "…");
+    }
+  }, []);
+
+  const handlePremiumClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation(); // Prevent the #main click listener from firing
+    if (isLoggedIn) {
+      clearSpotifyAuth();
+      setIsLoggedIn(false);
+      console.log("[Spotify] Logged out.");
+    } else {
+      redirectToSpotifyLogin();
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -185,7 +212,9 @@ export default function Home() {
               </div>
               <div id="nright">
                 <a href="#"><span>Audio</span></a>
-                <a href="#"><span>Premium</span></a>
+                <a href="#" onClick={handlePremiumClick}>
+                  <span>{isLoggedIn ? "Connected ✓" : "Premium"}</span>
+                </a>
               </div>
             </div>
             <div id="hero">
