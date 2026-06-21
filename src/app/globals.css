@@ -309,8 +309,17 @@ body, html {
 
 #heroleft .elem {
     position: relative;
-    height: 8.5vw; /* Perfectly scaled wrapper to prevent vertical gaps */
+    /* Base height for first element */
+    height: 7.5vw; 
     overflow: hidden;
+}
+
+/* Adjust wrapper heights for smaller elements */
+#heroleft .elem:nth-child(2) {
+    height: 5.5vw;
+}
+#heroleft .elem:nth-child(3) {
+    height: 4vw;
 }
 
 #heroleft .elem h1 {
@@ -320,12 +329,21 @@ body, html {
     font-weight: 100;
     top: 100%;
     left: 0;
-    font-size: 8vw;
+    font-size: 7vw;
     line-height: 0.9;
     text-transform: uppercase;
     user-select: none; /* Prevents accidental blue text highlighting during animation clicks */
     white-space: nowrap;
     transition: color 0.3s ease;
+}
+
+#heroleft .elem:nth-child(2) h1 {
+    font-size: 5vw;
+}
+
+#heroleft .elem:nth-child(3) h1 {
+    font-size: 3.5vw;
+    opacity: 0.8; /* Subtle transparency to push it down the visual hierarchy */
 }
 
 #heroleft .elem h1:nth-child(1) {

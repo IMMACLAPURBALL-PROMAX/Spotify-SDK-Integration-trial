@@ -170,16 +170,29 @@ const fragmentShader = /* glsl */ `
     }
 
     // ── Hover Lens (queue preview) ──
-    // This is separate from the Shery gooey transition — it reveals texture3
-    // through a soft circular lens around the cursor
+    // Organic, spinning, shape-shifting liquid blob driven by fBm noise
     if (uHover > 0.0) {
-      vec2 uv3 = coverUv(uv, uImageRes3, uResolution);
-      vec4 tex3 = texture2D(uTexture3, uv3);
+      vec2 mouseDir = pos - mouse;
+      float dist = length(mouseDir);
+      float angle = atan(mouseDir.y, mouseDir.x);
+      
+      // Time-based rotation for the amoeba blob
+      float spinAngle = angle + uTime * 0.4;
+      
+      // Noise displacement to create continuous organic morphing
+      float blobNoise = snoise(vec3(cos(spinAngle)*1.5, sin(spinAngle)*1.5, uTime * 0.25));
+      
+      // Dynamic radius based on hover state and noise
+      float dynamicRadius = (0.18 + blobNoise * 0.07) * uHover;
+      
+      // Smooth liquid edge
+      float lensEdge = smoothstep(dynamicRadius, dynamicRadius + 0.04, dist);
 
-      float dist = distance(pos, mouse);
-      float lensRadius = 0.1 * uHover;
-      // Soft organic edge using noise
-      float lensEdge = smoothstep(lensRadius, lensRadius + 0.04, dist + noise * 0.02);
+      // Liquid Refraction: distort the UVs for a magnifying glass effect
+      vec2 refractUv = uv + mouseDir * (1.0 - lensEdge) * 0.12 * uHover;
+      
+      vec2 uv3 = coverUv(refractUv, uImageRes3, uResolution);
+      vec4 tex3 = texture2D(uTexture3, uv3);
 
       gl_FragColor = mix(tex3, baseColor, lensEdge);
     } else {
@@ -374,8 +387,8 @@ export class BackgroundEffect {
     this.animationId = requestAnimationFrame(this.animate);
     this.material.uniforms.uTime.value = this.clock.getElapsedTime();
 
-    // Lerp the mouse position for smooth cursor tracking
-    this.mouseLerped.lerp(this.mouseTarget, 0.08);
+    // Lerp the mouse position for smooth, elegant liquid cursor tracking
+    this.mouseLerped.lerp(this.mouseTarget, 0.04);
     this.material.uniforms.uMouse.value.copy(this.mouseLerped);
 
     this.renderer.render(this.scene, this.camera);
