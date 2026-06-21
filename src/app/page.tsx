@@ -133,17 +133,14 @@ export default function Home() {
           // Column 1: Song Title
           h1s[nextIndex].textContent = newTrackData.name;
         } else if (colIndex === 1) {
-          // Column 2: Primary Artist
-          h1s[nextIndex].textContent = newTrackData.primaryArtist;
+          // Column 2: Artist (with featured artists appended)
+          const featText = newTrackData.featuredArtists && newTrackData.featuredArtists.length > 0
+            ? ` ft. ${newTrackData.featuredArtists.join(", ")}`
+            : "";
+          h1s[nextIndex].textContent = newTrackData.primaryArtist + featText;
         } else if (colIndex === 2) {
           // Column 3: Album Name
           h1s[nextIndex].textContent = newTrackData.albumName || "";
-        } else if (colIndex === 3) {
-          // Column 4: Featured Artists
-          h1s[nextIndex].textContent =
-            newTrackData.featuredArtists && newTrackData.featuredArtists.length > 0
-              ? `feat. ${newTrackData.featuredArtists.join(", ")}`
-              : "";
         }
       }
 
@@ -319,8 +316,8 @@ export default function Home() {
                   <h1>BURY A FRIEND</h1>
                   <h1>Happier Than</h1>
                 </div>
-                {/* Column 2: Primary Artist */}
-                <div className="elem artist-col">
+                {/* Column 2: Artist */}
+                <div className="elem">
                   <h1>{isSpotifyActive ? playerState.currentTrack!.primaryArtist : "007 theme."}</h1>
                   <h1>ocean waves.</h1>
                   <h1>at me.</h1>
@@ -328,20 +325,12 @@ export default function Home() {
                   <h1>Ever Before.</h1>
                 </div>
                 {/* Column 3: Album name */}
-                <div className="elem album-col">
+                <div className="elem">
                   <h1>{isSpotifyActive ? (playerState.currentTrack!.albumName || "") : "orchestral."}</h1>
                   <h1>deep blue.</h1>
                   <h1>colors.</h1>
                   <h1>alone.</h1>
                   <h1>heaven.</h1>
-                </div>
-                {/* Column 4: Featured Artists */}
-                <div className="elem feature-col">
-                  <h1>{isSpotifyActive && playerState.currentTrack!.featuredArtists.length > 0 ? `feat. ${playerState.currentTrack!.featuredArtists.join(", ")}` : ""}</h1>
-                  <h1></h1>
-                  <h1></h1>
-                  <h1></h1>
-                  <h1></h1>
                 </div>
                 <button>
                   Listen Now

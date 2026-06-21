@@ -153,7 +153,7 @@ body, html {
     cursor: pointer;
     padding: 8px 16px;
     border-radius: 100px;
-    overflow: hidden;
+    overflow: visible; /* Must NOT be hidden or it clips the slider thumb */
     font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
@@ -207,23 +207,16 @@ body, html {
     z-index: 3;
 }
 
-.audio-wrapper {
-    min-width: 60px;
-    transition: min-width 0.3s, color 0.3s;
-}
-
-.audio-wrapper:hover {
-    min-width: 100px; /* Expand to give the slider enough room to be dragged */
-    color: #000;
-}
-
-.audio-wrapper:hover .audio-text {
+/* Show slider and hide text on hover OR while the slider is being dragged (focus-within) */
+.audio-wrapper:hover .audio-text,
+.audio-wrapper:focus-within .audio-text {
     opacity: 0;
 }
 
-.audio-wrapper:hover .volume-slider-container {
+.audio-wrapper:hover .volume-slider-container,
+.audio-wrapper:focus-within .volume-slider-container {
     opacity: 1;
-    pointer-events: auto; /* Fix for dragging */
+    pointer-events: auto;
 }
 
 .volume-slider-container input[type="range"] {
@@ -231,6 +224,9 @@ body, html {
     -webkit-appearance: none;
     appearance: none;
     background: transparent;
+    cursor: pointer;
+    position: relative;
+    z-index: 10;
 }
 
 .volume-slider-container input[type="range"]::-webkit-slider-runnable-track {
@@ -243,12 +239,12 @@ body, html {
 .volume-slider-container input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    height: 10px;
-    width: 10px;
+    height: 14px;
+    width: 14px;
     border-radius: 50%;
     background: #000;
-    margin-top: -3.5px;
-    cursor: pointer;
+    margin-top: -5.5px;
+    cursor: grab;
 }
 
 
@@ -288,7 +284,7 @@ body, html {
     transform: scaleX(1); /* Expands the green pill background instantly */
 }
 /* ==========================================
-   HERO / MAIN CONTENT
+   HERO INTERIOR LAYOUT
    ========================================== */
 #hero {
     display: flex;
@@ -299,68 +295,37 @@ body, html {
     top: 52%;
     transform: translateY(-50%);
     left: 0;
-    color: #fff;
-    pointer-events: none;
-    transition: color 0.3s ease;
 }
 
 /* Force hero text to Spotify Black when background is light */
-#hero.force-black {
+#hero.force-black #heroleft .elem h1 {
     color: #191414;
+    transition: color 0.3s ease;
 }
 
 #heroleft {
     flex: 1;
-    min-width: 0; /* Ensures flex child can shrink for text-overflow */
 }
 
 #heroleft .elem {
     position: relative;
     height: 8.5vw; /* Perfectly scaled wrapper to prevent vertical gaps */
     overflow: hidden;
-    min-width: 0;
 }
 
 #heroleft .elem h1 {
     position: absolute;
     font-family: "kajiro", sans-serif;
-    color: inherit; /* inherit from #hero */
+    color: white;
     font-weight: 100;
     top: 100%;
     left: 0;
     font-size: 8vw;
     line-height: 0.9;
     text-transform: uppercase;
-    user-select: none;
+    user-select: none; /* Prevents accidental blue text highlighting during animation clicks */
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    width: 100%; /* Important for text-overflow to work in block elements */
-}
-
-/* Priority logic using flex-shrink */
-#heroleft .elem:nth-child(1) { /* Song Title */
-    flex-shrink: 0; 
-}
-.artist-col {
-    flex-shrink: 1;
-}
-.album-col {
-    flex-shrink: 3;
-}
-.feature-col {
-    flex-shrink: 5;
-}
-
-@media (max-width: 1200px) {
-    .feature-col {
-        display: none;
-    }
-}
-@media (max-width: 900px) {
-    .album-col {
-        display: none;
-    }
+    transition: color 0.3s ease;
 }
 
 #heroleft .elem h1:nth-child(1) {
