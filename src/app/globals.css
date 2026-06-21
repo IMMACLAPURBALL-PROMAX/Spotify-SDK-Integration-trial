@@ -207,13 +207,23 @@ body, html {
     z-index: 3;
 }
 
+.audio-wrapper {
+    min-width: 60px;
+    transition: min-width 0.3s, color 0.3s;
+}
+
+.audio-wrapper:hover {
+    min-width: 100px; /* Expand to give the slider enough room to be dragged */
+    color: #000;
+}
+
 .audio-wrapper:hover .audio-text {
     opacity: 0;
 }
 
 .audio-wrapper:hover .volume-slider-container {
     opacity: 1;
-    pointer-events: all;
+    pointer-events: auto; /* Fix for dragging */
 }
 
 .volume-slider-container input[type="range"] {
@@ -325,8 +335,20 @@ body, html {
     width: 100%; /* Important for text-overflow to work */
 }
 
-/* Responsive display priority logic */
-/* Priority: Song Title (no class) > Primary Artist (.artist-col) > Album (.album-col) > Features (.feature-col) */
+/* Priority logic using flex-shrink */
+#heroleft .elem:nth-child(1) { /* Song Title */
+    flex-shrink: 0; 
+}
+.artist-col {
+    flex-shrink: 1;
+}
+.album-col {
+    flex-shrink: 3;
+}
+.feature-col {
+    flex-shrink: 5;
+}
+
 @media (max-width: 1200px) {
     .feature-col {
         display: none;
