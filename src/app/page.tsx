@@ -10,7 +10,7 @@ import {
 import { BackgroundEffect } from "@/lib/background-effect";
 import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
 
-// ── Static fallback data (used when Spotify is not connected) ──
+// ── Static fallback data ──
 const STATIC_IMAGES = [
   "/images/billie_1.jpg",
   "/images/billie7.jpg",
@@ -38,13 +38,12 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const backRef = useRef<HTMLDivElement>(null);
   const bgEffectRef = useRef<BackgroundEffect | null>(null);
-  const lastTrackIdRef = useRef<string | null>(null);
 
-  // Static mode state (when Spotify is not connected)
-  const staticIndexRef = useRef(0);
+  // Animation and track state
+  const lastTrackIdRef = useRef<string | null>(null);
+  const masterIndexRef = useRef(0);
   const animatingRef = useRef(false);
 
-  // Spotify player hook
   const { state: playerState, controls } = useSpotifyPlayer();
   const isSpotifyActive = isLoggedIn && playerState.isReady && playerState.currentTrack !== null;
 
@@ -54,14 +53,22 @@ export default function Home() {
     if (token) setIsLoggedIn(true);
   }, []);
 
-  // ── Initialize the Three.js background effect ──
+  // ── GSAP Initial Setup ──
+  useEffect(() => {
+    const cards = document.querySelectorAll(".album-card");
+    if (cards.length > 0) {
+      gsap.set(cards, { opacity: 0, scale: 0.95, y: 10, rotation: -2 });
+      gsap.set(cards[0], { opacity: 1, scale: 1, y: 0, rotation: 0 });
+      cards[0].classList.add("active");
+    }
+  }, []);
+
+  // ── Initialize Three.js background effect ──
   useEffect(() => {
     if (!backRef.current) return;
 
     const fx = new BackgroundEffect(backRef.current);
     bgEffectRef.current = fx;
-
-    // Load the first static image as the initial background
     fx.setImage(STATIC_IMAGES[0]);
 
     return () => {
@@ -70,64 +77,42 @@ export default function Home() {
     };
   }, []);
 
-  // ── Sync background with Spotify track changes ──
+  // ── Sync background & trigger GSAP on Spotify track changes ──
   useEffect(() => {
     if (!isSpotifyActive || !bgEffectRef.current || !playerState.currentTrack) return;
 
     const trackId = playerState.currentTrack.id;
     const artUrl = playerState.currentTrack.albumArtUrl;
 
-    // Only transition if the track actually changed
     if (trackId !== lastTrackIdRef.current && artUrl) {
       if (lastTrackIdRef.current === null) {
-        // First track — set immediately
+        // First track loaded, no GSAP transition needed yet
         bgEffectRef.current.setImage(artUrl);
+        // Also update the active card image manually for the first load
+        const activeCard = document.querySelector(".album-card.active") as HTMLImageElement;
+        if (activeCard) activeCard.src = artUrl;
       } else {
-        // Subsequent tracks — smooth gooey transition
+        // Track changed! Run GSAP transition visually.
         bgEffectRef.current.transitionTo(artUrl, 1.5);
+        runGsapTransition(artUrl, playerState.currentTrack);
       }
       lastTrackIdRef.current = trackId;
     }
   }, [isSpotifyActive, playerState.currentTrack]);
 
-  // ── Premium / Login button ──
-  const handlePremiumClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (isLoggedIn) {
-      clearSpotifyAuth();
-      setIsLoggedIn(false);
-      lastTrackIdRef.current = null;
-      // Reset to static background
-      if (bgEffectRef.current) {
-        bgEffectRef.current.setImage(STATIC_IMAGES[0]);
-        staticIndexRef.current = 0;
-      }
-      console.log("[Spotify] Logged out.");
-    } else {
-      redirectToSpotifyLogin();
-    }
-  };
-
-  // ── Main click handler ──
-  const handleMainClick = useCallback(() => {
-    if (isSpotifyActive) {
-      // Spotify is active — skip to next track
-      // The player_state_changed event will update the background automatically
-      controls.skipToNext();
-      return;
-    }
-
-    // Static fallback mode — cycle through local images and text
+  // ── Core GSAP Animation Logic ──
+  const runGsapTransition = (newImageUrl: string | null, newTrackData: any = null) => {
     if (animatingRef.current) return;
     animatingRef.current = true;
 
     const elems = document.querySelectorAll(".elem");
-    const totalSlides = 5;
-    const currentIndex = staticIndexRef.current;
+    const cards = document.querySelectorAll(".album-card");
+    const totalSlides = 5; // We still cycle the 5 DOM elements for text and cards
+
+    const currentIndex = masterIndexRef.current;
     const nextIndex = (currentIndex + 1) % totalSlides;
 
-    // Text animation
+    // 1. Text rolling animation
     elems.forEach((elem) => {
       const h1s = elem.querySelectorAll("h1");
       gsap.to(h1s[currentIndex], {
@@ -146,16 +131,22 @@ export default function Home() {
       });
     });
 
-    // Background transition
-    if (bgEffectRef.current) {
-      bgEffectRef.current.transitionTo(STATIC_IMAGES[nextIndex], 1.5);
+    // 2. Card flying animation
+    const outgoing = cards[currentIndex] as HTMLImageElement;
+    const incoming = cards[nextIndex] as HTMLImageElement;
+
+    // If Spotify is active, we dynamically update the incoming card's image to the new album art
+    if (newImageUrl) {
+      incoming.src = newImageUrl;
     }
 
-    // Player card animation (static mode)
-    const cards = document.querySelectorAll(".album-card");
-    const outgoing = cards[currentIndex];
-    const incoming = cards[nextIndex];
-    const data = STATIC_TRACK_DATA[nextIndex];
+    // Determine what text to show in the metadata block
+    const isSpotify = !!newTrackData;
+    const title = isSpotify ? newTrackData.name : STATIC_TRACK_DATA[nextIndex].title;
+    const artist = isSpotify ? newTrackData.artist : STATIC_TRACK_DATA[nextIndex].artist;
+    const timeStart = isSpotify ? "0:00" : STATIC_TRACK_DATA[nextIndex].time;
+    const timeEnd = isSpotify ? formatMs(newTrackData.durationMs) : STATIC_TRACK_DATA[nextIndex].duration;
+    const progressWidth = isSpotify ? "0%" : STATIC_TRACK_DATA[nextIndex].progress;
 
     gsap.timeline()
       .to(outgoing, {
@@ -171,13 +162,13 @@ export default function Home() {
         onComplete: () => {
           const titleEl = document.querySelector(".track-title") as HTMLElement;
           const artistEl = document.querySelector(".artist-name") as HTMLElement;
-          const timeStart = document.querySelector(".playback-timeline .time-stamp:first-child") as HTMLElement;
-          const timeEnd = document.querySelector(".playback-timeline .time-stamp:last-child") as HTMLElement;
-          if (titleEl) titleEl.innerText = data.title;
-          if (artistEl) artistEl.innerText = data.artist;
-          if (timeStart) timeStart.innerText = data.time;
-          if (timeEnd) timeEnd.innerText = data.duration;
-          gsap.to(".progress-bar-fill", { width: data.progress, duration: 0.4, ease: "power1.out" });
+          const ts1 = document.querySelector(".playback-timeline .time-stamp:first-child") as HTMLElement;
+          const ts2 = document.querySelector(".playback-timeline .time-stamp:last-child") as HTMLElement;
+          if (titleEl) titleEl.innerText = title;
+          if (artistEl) artistEl.innerText = artist;
+          if (ts1) ts1.innerText = timeStart;
+          if (ts2) ts2.innerText = timeEnd;
+          gsap.to(".progress-bar-fill", { width: progressWidth, duration: 0.4, ease: "power1.out" });
         },
       }, "<")
       .to([".track-title", ".artist-name", ".time-stamp:first-child", ".time-stamp:last-child"], {
@@ -190,37 +181,64 @@ export default function Home() {
         }, "-=0.2"
       );
 
-    staticIndexRef.current = nextIndex;
+    masterIndexRef.current = nextIndex;
+  };
+
+  // ── Main click handler ──
+  const handleMainClick = useCallback(() => {
+    if (isSpotifyActive) {
+      // Trigger Spotify skip. The `useEffect` above will run the GSAP transition
+      // automatically when Spotify confirms the track actually changed.
+      controls.skipToNext();
+    } else {
+      // Static mode: trigger transition immediately
+      const nextIndex = (masterIndexRef.current + 1) % 5;
+      if (bgEffectRef.current) {
+        bgEffectRef.current.transitionTo(STATIC_IMAGES[nextIndex], 1.5);
+      }
+      runGsapTransition(null, null);
+    }
   }, [isSpotifyActive, controls]);
 
-  // ── Derive display values ──
-  const displayTrackTitle = isSpotifyActive
-    ? playerState.currentTrack!.name
-    : "LUNCH";
-  const displayArtistName = isSpotifyActive
-    ? playerState.currentTrack!.artist
-    : "Billie Eilish";
-  const displayCurrentTime = isSpotifyActive
-    ? formatMs(playerState.positionMs)
-    : "0:00";
-  const displayTotalTime = isSpotifyActive
-    ? formatMs(playerState.currentTrack!.durationMs)
-    : "3:02";
-  const displayProgress = isSpotifyActive
-    ? `${Math.round((playerState.positionMs / playerState.currentTrack!.durationMs) * 100)}%`
-    : "25%";
-  const displayAlbumArt = isSpotifyActive
-    ? playerState.currentTrack!.albumArtUrl
-    : "/images/cover1.jpg";
+  // ── Premium / Login button ──
+  const handlePremiumClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isLoggedIn) {
+      clearSpotifyAuth();
+      setIsLoggedIn(false);
+      lastTrackIdRef.current = null;
+      if (bgEffectRef.current) {
+        bgEffectRef.current.setImage(STATIC_IMAGES[0]);
+        masterIndexRef.current = 0;
+      }
+    } else {
+      redirectToSpotifyLogin();
+    }
+  };
+
+  // ── Derived dynamic labels ──
+  // For Spotify mode, we update the progress bar and current time continuously via React.
+  // The Track Title and Artist are updated by GSAP to match the slide animation timing!
+  useEffect(() => {
+    if (isSpotifyActive && playerState.currentTrack) {
+      const ts1 = document.querySelector(".playback-timeline .time-stamp:first-child") as HTMLElement;
+      if (ts1) ts1.innerText = formatMs(playerState.positionMs);
+      const progressPercent = `${Math.round((playerState.positionMs / playerState.currentTrack.durationMs) * 100)}%`;
+      const fill = document.querySelector(".progress-bar-fill") as HTMLElement;
+      if (fill && !animatingRef.current) {
+        fill.style.width = progressPercent;
+      }
+    }
+  }, [isSpotifyActive, playerState.positionMs, playerState.currentTrack]);
+
   const nowPlayingLabel = isSpotifyActive
     ? (playerState.isPaused ? "PAUSED" : "NOW PLAYING")
     : "NOW PLAYING";
 
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-before-interactive-script-outside-document */}
       <div id="main" onClick={handleMainClick}>
-        {/* Three.js canvas mounts here */}
         <div id="back" ref={backRef} />
 
         <div id="top">
@@ -238,6 +256,7 @@ export default function Home() {
                 </a>
               </div>
             </div>
+            
             <div id="hero">
               <div id="heroleft">
                 <div className="elem">
@@ -268,39 +287,35 @@ export default function Home() {
                   </svg>
                 </button>
               </div>
+
               <div id="heroright">
                 <p>{nowPlayingLabel}</p>
 
-                {isSpotifyActive ? (
-                  <div className="imagediv">
-                    <img src={displayAlbumArt} className="album-card active" alt="Now Playing Album Art" />
-                  </div>
-                ) : (
-                  <div className="imagediv">
-                    <img src="/images/cover1.jpg" className="album-card active" alt="No Time To Die" />
-                    <img src="/images/cover2.jpg" className="album-card" alt="HIT ME HARD AND SOFT Era" />
-                    <img src="/images/cover3.jpg" className="album-card" alt="dont smile at me Era" />
-                    <img src="/images/cover4.jpg" className="album-card" alt="WHEN WE ALL FALL ASLEEP Era" />
-                    <img src="/images/cover5.jpg" className="album-card" alt="Happier Than Ever" />
-                  </div>
-                )}
+                {/* We render all 5 cards so GSAP can cycle through them. 
+                    In Spotify mode, GSAP dynamically swaps the src of the incoming card. */}
+                <div className="imagediv">
+                  <img src="/images/cover1.jpg" className="album-card" alt="Deck Card 1" />
+                  <img src="/images/cover2.jpg" className="album-card" alt="Deck Card 2" />
+                  <img src="/images/cover3.jpg" className="album-card" alt="Deck Card 3" />
+                  <img src="/images/cover4.jpg" className="album-card" alt="Deck Card 4" />
+                  <img src="/images/cover5.jpg" className="album-card" alt="Deck Card 5" />
+                </div>
 
                 <div className="player-meta">
-                  <h3 className="track-title">{displayTrackTitle}</h3>
-                  <p className="artist-name">{displayArtistName}</p>
+                  <h3 className="track-title">LUNCH</h3>
+                  <p className="artist-name">Billie Eilish</p>
                 </div>
 
                 <div className="playback-timeline">
-                  <span className="time-stamp" id="current-time">{displayCurrentTime}</span>
+                  <span className="time-stamp" id="current-time">0:00</span>
                   <div className="progress-bar-container">
-                    <div className="progress-bar-fill" style={isSpotifyActive ? { width: displayProgress } : undefined} />
+                    <div className="progress-bar-fill"></div>
                   </div>
-                  <span className="time-stamp" id="total-time">{displayTotalTime}</span>
+                  <span className="time-stamp" id="total-time">3:02</span>
                 </div>
 
                 <div className="player-controls">
-                  <button className="control-btn secondary-btn" aria-label="Shuffle"
-                    onClick={(e) => e.stopPropagation()}>
+                  <button className="control-btn secondary-btn" aria-label="Shuffle" onClick={e => e.stopPropagation()}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
                   </button>
 
@@ -319,8 +334,7 @@ export default function Home() {
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6zm9-12h2v12h-2z" /></svg>
                   </button>
 
-                  <button className="control-btn secondary-btn" aria-label="Repeat"
-                    onClick={(e) => e.stopPropagation()}>
+                  <button className="control-btn secondary-btn" aria-label="Repeat" onClick={e => e.stopPropagation()}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
                   </button>
                 </div>

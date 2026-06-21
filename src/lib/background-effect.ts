@@ -188,6 +188,7 @@ export class BackgroundEffect {
     this.container = container;
     this.clock = new THREE.Clock();
     this.loader = new THREE.TextureLoader();
+    this.loader.setCrossOrigin("anonymous");
 
     // Renderer — fills the container
     this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
