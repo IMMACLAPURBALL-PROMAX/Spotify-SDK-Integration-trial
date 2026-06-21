@@ -9,6 +9,7 @@ import {
 } from "@/lib/spotify-auth";
 import { BackgroundEffect } from "@/lib/background-effect";
 import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
+import { useImageBrightness } from "@/hooks/useImageBrightness";
 
 // ── Static fallback data ──
 const STATIC_IMAGES = [
@@ -46,6 +47,7 @@ export default function Home() {
 
   const { state: playerState, controls } = useSpotifyPlayer();
   const isSpotifyActive = isLoggedIn && playerState.isReady && playerState.currentTrack !== null;
+  const brightness = useImageBrightness(playerState.currentTrack?.albumArtUrl || STATIC_IMAGES[0]);
 
   // ── Auth check on mount ──
   useEffect(() => {
@@ -253,7 +255,7 @@ export default function Home() {
 
         <div id="top">
           <div id="workingarea">
-            <div id="nav">
+            <div id="nav" className={brightness.navIsLight ? "force-pill" : ""}>
               <div id="nleft">
                 <img src="/images/Spotifylogo.png" alt="Spotify Logo" />
                 <a href="#"><span>Soundscapes</span></a>
@@ -282,9 +284,9 @@ export default function Home() {
               </div>
             </div>
             
-            <div id="hero">
+            <div id="hero" className={brightness.heroIsLight ? "force-black" : ""}>
               <div id="heroleft">
-                {/* Column 1: Song name (or static fallback) */}
+                {/* Column 1: Song name */}
                 <div className="elem">
                   <h1>{isSpotifyActive ? playerState.currentTrack!.name : "No Time To Die"}</h1>
                   <h1>CHIHIRO</h1>
@@ -292,21 +294,29 @@ export default function Home() {
                   <h1>BURY A FRIEND</h1>
                   <h1>Happier Than</h1>
                 </div>
-                {/* Column 2: Artist name */}
-                <div className="elem">
-                  <h1>{isSpotifyActive ? playerState.currentTrack!.artist : "007 theme."}</h1>
+                {/* Column 2: Primary Artist */}
+                <div className="elem artist-col">
+                  <h1>{isSpotifyActive ? playerState.currentTrack!.primaryArtist : "007 theme."}</h1>
                   <h1>ocean waves.</h1>
                   <h1>at me.</h1>
                   <h1>sleepwalk.</h1>
                   <h1>Ever Before.</h1>
                 </div>
                 {/* Column 3: Album name */}
-                <div className="elem">
+                <div className="elem album-col">
                   <h1>{isSpotifyActive ? (playerState.currentTrack!.albumName || "") : "orchestral."}</h1>
                   <h1>deep blue.</h1>
                   <h1>colors.</h1>
                   <h1>alone.</h1>
                   <h1>heaven.</h1>
+                </div>
+                {/* Column 4: Featured Artists */}
+                <div className="elem feature-col">
+                  <h1>{isSpotifyActive && playerState.currentTrack!.featuredArtists.length > 0 ? `feat. ${playerState.currentTrack!.featuredArtists.join(", ")}` : ""}</h1>
+                  <h1></h1>
+                  <h1></h1>
+                  <h1></h1>
+                  <h1></h1>
                 </div>
                 <button>
                   Listen Now

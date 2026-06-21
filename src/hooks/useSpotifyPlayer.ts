@@ -16,7 +16,8 @@ import { getStoredAccessToken } from "@/lib/spotify-auth";
 export interface SpotifyTrackInfo {
   id: string | null;
   name: string;
-  artist: string;
+  primaryArtist: string;
+  featuredArtists: string[];
   albumName: string;
   albumArtUrl: string; // Largest available image
   durationMs: number;
@@ -95,8 +96,9 @@ export function useSpotifyPlayer(): {
       const artUrl = images.length > 0 ? images[0].url : "";
       return {
         id: track.id,
-        name: track.name,
-        artist: track.artists.map((a) => a.name).join(", "),
+        name: track.name.replace(/\s*(?:\(|\[|-)?\s*(?:feat\.?|featuring|with)\s+.*?(?:\)|\])?$/i, "").trim(),
+        primaryArtist: track.artists.length > 0 ? track.artists[0].name : "Unknown Artist",
+        featuredArtists: track.artists.length > 1 ? track.artists.slice(1).map(a => a.name) : [],
         albumName: track.album.name,
         albumArtUrl: artUrl,
         durationMs: track.duration_ms,

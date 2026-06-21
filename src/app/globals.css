@@ -110,8 +110,36 @@ body, html {
     transition: color 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-#nav a:hover {
-    color: #fff;
+#nav a::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1DB954;
+    z-index: 1;
+    transform: scaleX(0);
+    transform-origin: left;
+    border-radius: 100px;
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.3, 1);
+}
+
+#nav a span {
+    position: relative;
+    z-index: 2;
+}
+
+#nav a:hover,
+#nav.force-pill a,
+#nav.force-pill .audio-wrapper {
+    color: #000;
+}
+
+#nav a:hover::before,
+#nav.force-pill a::before,
+#nav.force-pill .audio-wrapper::before {
+    transform: scaleX(1);
 }
 
 /* ==========================================
@@ -250,17 +278,23 @@ body, html {
     transform: scaleX(1); /* Expands the green pill background instantly */
 }
 /* ==========================================
-   HERO INTERIOR LAYOUT
+   HERO / MAIN CONTENT
    ========================================== */
 #hero {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    padding: 0 4rem;
+    height: 100%;
     width: 100%;
-    position: absolute;
-    top: 52%;
-    transform: translateY(-50%);
-    left: 0;
+    color: #fff;
+    pointer-events: none;
+    transition: color 0.3s ease;
+}
+
+/* Force hero text to Spotify Black when background is light */
+#hero.force-black {
+    color: #191414;
 }
 
 #heroleft {
@@ -271,20 +305,37 @@ body, html {
     position: relative;
     height: 8.5vw; /* Perfectly scaled wrapper to prevent vertical gaps */
     overflow: hidden;
+    min-width: 0;
 }
 
 #heroleft .elem h1 {
     position: absolute;
     font-family: "kajiro", sans-serif;
-    color: white;
+    color: inherit; /* inherit from #hero */
     font-weight: 100;
     top: 100%;
     left: 0;
     font-size: 8vw;
     line-height: 0.9;
     text-transform: uppercase;
-    user-select: none; /* Prevents accidental blue text highlighting during animation clicks */
+    user-select: none;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%; /* Important for text-overflow to work */
+}
+
+/* Responsive display priority logic */
+/* Priority: Song Title (no class) > Primary Artist (.artist-col) > Album (.album-col) > Features (.feature-col) */
+@media (max-width: 1200px) {
+    .feature-col {
+        display: none;
+    }
+}
+@media (max-width: 900px) {
+    .album-col {
+        display: none;
+    }
 }
 
 #heroleft .elem h1:nth-child(1) {
