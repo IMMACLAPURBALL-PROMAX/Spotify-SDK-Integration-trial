@@ -124,8 +124,29 @@ export default function Home() {
     }
 
     // 1. Text rolling animation
-    elems.forEach((elem) => {
+    elems.forEach((elem, colIndex) => {
       const h1s = elem.querySelectorAll("h1");
+
+      // Update the incoming h1 text for Spotify mode
+      if (isSpotifyActive && newTrackData && h1s[nextIndex]) {
+        if (colIndex === 0) {
+          // Column 1: Song Title
+          h1s[nextIndex].textContent = newTrackData.name;
+        } else if (colIndex === 1) {
+          // Column 2: Primary Artist
+          h1s[nextIndex].textContent = newTrackData.primaryArtist;
+        } else if (colIndex === 2) {
+          // Column 3: Album Name
+          h1s[nextIndex].textContent = newTrackData.albumName || "";
+        } else if (colIndex === 3) {
+          // Column 4: Featured Artists
+          h1s[nextIndex].textContent =
+            newTrackData.featuredArtists && newTrackData.featuredArtists.length > 0
+              ? `feat. ${newTrackData.featuredArtists.join(", ")}`
+              : "";
+        }
+      }
+
       gsap.to(h1s[currentIndex], {
         top: "-=100%",
         ease: "expo.inOut",
@@ -154,7 +175,11 @@ export default function Home() {
     // Determine what text to show in the metadata block
     const isSpotify = !!newTrackData;
     const title = isSpotify ? newTrackData.name : STATIC_TRACK_DATA[nextIndex].title;
-    const artist = isSpotify ? newTrackData.artist : STATIC_TRACK_DATA[nextIndex].artist;
+    const artist = isSpotify
+      ? (newTrackData.featuredArtists && newTrackData.featuredArtists.length > 0
+          ? `${newTrackData.primaryArtist} feat. ${newTrackData.featuredArtists.join(", ")}`
+          : newTrackData.primaryArtist)
+      : STATIC_TRACK_DATA[nextIndex].artist;
     const timeStart = isSpotify ? "0:00" : STATIC_TRACK_DATA[nextIndex].time;
     const timeEnd = isSpotify ? formatMs(newTrackData.durationMs) : STATIC_TRACK_DATA[nextIndex].duration;
     const progressWidth = isSpotify ? "0%" : STATIC_TRACK_DATA[nextIndex].progress;
