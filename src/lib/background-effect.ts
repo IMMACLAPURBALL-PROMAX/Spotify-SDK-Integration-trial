@@ -128,9 +128,10 @@ const fragmentShader = /* glsl */ `
     float n2 = snoise(vec3(uv * uNoiseScale * 0.5 + 100.0, t * 0.7));
 
     // Base distortion (continuous ambient wobble)
+    // Shery.js uses a very subtle internal multiplier; 0.003 matches it closely
     vec2 distortion = vec2(
-      n * uNoiseHeight * 0.012 * uDistortA,
-      n2 * uNoiseHeight * 0.012 * uDistortB
+      n * uNoiseHeight * 0.003 * uDistortA,
+      n2 * uNoiseHeight * 0.003 * uDistortB
     );
 
     vec2 uv1 = coverUv(uv + distortion, uImageRes1, uResolution);
@@ -167,8 +168,8 @@ const fragmentShader = /* glsl */ `
       vec2 aspectMouse = vec2(uMouse.x * (uResolution.x / uResolution.y), uMouse.y);
       float dist = distance(aspectUv, aspectMouse);
       
-      float lensRadius = 0.25 * uHover;
-      float lensEdge = smoothstep(lensRadius - 0.05, lensRadius + 0.05, dist - n * 0.08);
+      float lensRadius = 0.12 * uHover;
+      float lensEdge = smoothstep(lensRadius - 0.03, lensRadius + 0.03, dist - n * 0.03);
       
       gl_FragColor = mix(tex3, baseColor, lensEdge);
     } else {
@@ -198,6 +199,10 @@ export class BackgroundEffect {
 
   private loader: THREE.TextureLoader;
   private isTransitioning = false;
+
+  // Mouse position lerping for smooth cursor tracking
+  private mouseTarget = new THREE.Vector2(0.5, 0.5);
+  private mouseLerped = new THREE.Vector2(0.5, 0.5);
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -358,6 +363,11 @@ export class BackgroundEffect {
   private animate = (): void => {
     this.animationId = requestAnimationFrame(this.animate);
     this.material.uniforms.uTime.value = this.clock.getElapsedTime();
+
+    // Lerp the mouse position for smooth cursor tracking
+    this.mouseLerped.lerp(this.mouseTarget, 0.08);
+    this.material.uniforms.uMouse.value.copy(this.mouseLerped);
+
     this.renderer.render(this.scene, this.camera);
   };
 
@@ -365,17 +375,17 @@ export class BackgroundEffect {
     const rect = this.container.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
     const y = 1.0 - ((e.clientY - rect.top) / rect.height);
-    this.material.uniforms.uMouse.value.set(x, y);
+    this.mouseTarget.set(x, y);
   };
 
   private onMouseEnter = () => {
     if (this.texture3) {
-      gsap.to(this.material.uniforms.uHover, { value: 1, duration: 0.5, ease: "power2.out" });
+      gsap.to(this.material.uniforms.uHover, { value: 1, duration: 0.8, ease: "power2.out" });
     }
   };
 
   private onMouseLeave = () => {
-    gsap.to(this.material.uniforms.uHover, { value: 0, duration: 0.5, ease: "power2.in" });
+    gsap.to(this.material.uniforms.uHover, { value: 0, duration: 0.6, ease: "power2.in" });
   };
 
   private onResize = (): void => {

@@ -97,15 +97,21 @@ body, html {
     text-decoration: none;
     color: rgba(255, 255, 255, 0.65); /* Faded silver white for base balance */
     font-size: 11px;
-    font-weight: 700; /* Bumped weight slightly for better readability over green */
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 2px;
     position: relative;
+    padding: 8px 16px;
+    border-radius: 100px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
     transition: color 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 #nav a:hover {
-    color: #fff; /* Ignites to pure white when interacted with */
+    color: #fff;
 }
 
 /* ==========================================
@@ -113,30 +119,64 @@ body, html {
    ========================================== */
 .audio-wrapper {
     position: relative;
-    display: flex;
+    display: inline-flex;
     align-items: center;
+    justify-content: center;
     cursor: pointer;
-    width: 80px; /* Fixed width to prevent layout shift */
-    height: 20px;
+    padding: 8px 16px;
+    border-radius: 100px;
+    overflow: hidden;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.65);
+    transition: color 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.audio-wrapper:hover {
+    color: #000;
+}
+
+/* Green pill background for audio wrapper on hover */
+.audio-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1DB954;
+    z-index: 1;
+    transform: scaleX(0);
+    transform-origin: left;
+    border-radius: 100px;
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.3, 1);
+}
+
+.audio-wrapper:hover::before {
+    transform: scaleX(1);
 }
 
 .audio-text {
     transition: opacity 0.3s ease;
     display: inline-block;
-    position: absolute;
-    left: 0;
+    position: relative;
+    z-index: 2;
 }
 
 .volume-slider-container {
     position: absolute;
-    left: 0;
-    width: 100%;
+    left: 8px;
+    right: 8px;
+    width: auto;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease;
     display: flex;
     align-items: center;
     height: 100%;
+    z-index: 3;
 }
 
 .audio-wrapper:hover .audio-text {
@@ -157,19 +197,19 @@ body, html {
 
 .volume-slider-container input[type="range"]::-webkit-slider-runnable-track {
     width: 100%;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.3);
+    height: 3px;
+    background: rgba(0, 0, 0, 0.3);
     border-radius: 2px;
 }
 
 .volume-slider-container input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    height: 12px;
-    width: 12px;
+    height: 10px;
+    width: 10px;
     border-radius: 50%;
-    background: #fff;
-    margin-top: -4px;
+    background: #000;
+    margin-top: -3.5px;
     cursor: pointer;
 }
 
