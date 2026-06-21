@@ -11,6 +11,10 @@ const SPOTIFY_TOKEN_ENDPOINT = "https://accounts.spotify.com/api/token";
 const SCOPES = [
   "user-read-email",
   "user-read-private",
+  "streaming",
+  "user-read-playback-state",
+  "user-modify-playback-state",
+  "user-read-currently-playing",
 ].join(" ");
 
 // ---- PKCE helpers ----
