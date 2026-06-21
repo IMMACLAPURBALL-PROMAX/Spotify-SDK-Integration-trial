@@ -123,35 +123,37 @@ const fragmentShader = /* glsl */ `
     vec2 uv = vUv;
     float aspect = uResolution.x / uResolution.y;
 
-    // ── Shery.js exact logic: noise as alpha mask, NOT UV distortion ──
-    // Position in aspect-corrected space (matches Shery pos)
+    // Position in aspect-corrected space
     vec2 pos = vec2(uv.x, uv.y / aspect);
 
-    // Noise value remapped to 0..1 (matches Shery noise calculation)
+    // Noise value remapped to 0..1 (for gooey alpha mask)
     float noise = (snoise(vec3(pos * uNoiseScale, uTime * uNoiseSpeed)) + 1.0) / 2.0;
 
-    // Interpolated gooey parameters based on transition progress
-    // Shery.js: vec2 interpole = mix(vec2(0), vec2(metaball, noise_height), uIntercept);
+    // Ambient liquid wobble on UVs (always active, gives the background life)
+    float wN1 = snoise(vec3(uv * uNoiseScale * 0.8, uTime * uNoiseSpeed * 0.6));
+    float wN2 = snoise(vec3(uv * uNoiseScale * 0.5 + 50.0, uTime * uNoiseSpeed * 0.4));
+    vec2 wobble = vec2(
+      wN1 * 0.003 * uDistortA,
+      wN2 * 0.003 * uDistortB
+    );
+
+    // Gooey transition alpha mask
     float interpMetaball = uMetaball * uProgress;
     float interpNoiseHeight = uNoiseHeight * uProgress;
-
-    // Base gooey value from noise
     float val = noise * interpNoiseHeight;
 
-    // Mouse metaball: creates a bubble near cursor that reveals the next image
-    // Shery.js: float u = 1. - smoothstep(interpole.x, 0., distance(mouse, pos));
+    // Mouse metaball
     vec2 mouse = vec2(uMouse.x, uMouse.y / aspect);
     float u = 1.0 - smoothstep(interpMetaball, 0.0, distance(mouse, pos));
     float mouseMetaball = clamp(1.0 - u, 0.0, 1.0);
     val += mouseMetaball;
 
-    // Alpha threshold (the gooey edge)
-    // Shery.js: float alpha = smoothstep(discard_threshold - antialias_threshold, discard_threshold, val);
+    // Alpha threshold (gooey edge)
     float alpha = smoothstep(uDiscard - 0.002, uDiscard, val);
 
-    // Cover-fit UVs for each texture
-    vec2 uv1 = coverUv(uv, uImageRes1, uResolution);
-    vec2 uv2 = coverUv(uv, uImageRes2, uResolution);
+    // Cover-fit UVs with ambient wobble applied
+    vec2 uv1 = coverUv(uv + wobble, uImageRes1, uResolution);
+    vec2 uv2 = coverUv(uv + wobble, uImageRes2, uResolution);
 
     vec4 tex1 = texture2D(uTexture1, uv1);
     vec4 tex2 = texture2D(uTexture2, uv2);

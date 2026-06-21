@@ -271,6 +271,8 @@ export default function Home() {
                       value={playerState.volume ?? 0.5} 
                       onChange={(e) => controls.setVolume(parseFloat(e.target.value))}
                       onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
                     />
                   </div>
                 </div>
@@ -282,22 +284,25 @@ export default function Home() {
             
             <div id="hero">
               <div id="heroleft">
+                {/* Column 1: Song name (or static fallback) */}
                 <div className="elem">
-                  <h1>No Time To Die</h1>
+                  <h1>{isSpotifyActive ? playerState.currentTrack!.name : "No Time To Die"}</h1>
                   <h1>CHIHIRO</h1>
                   <h1>dont smile</h1>
                   <h1>BURY A FRIEND</h1>
                   <h1>Happier Than</h1>
                 </div>
+                {/* Column 2: Artist name */}
                 <div className="elem">
-                  <h1>007 theme.</h1>
+                  <h1>{isSpotifyActive ? playerState.currentTrack!.artist : "007 theme."}</h1>
                   <h1>ocean waves.</h1>
                   <h1>at me.</h1>
                   <h1>sleepwalk.</h1>
                   <h1>Ever Before.</h1>
                 </div>
+                {/* Column 3: Album name */}
                 <div className="elem">
-                  <h1>orchestral.</h1>
+                  <h1>{isSpotifyActive ? (playerState.currentTrack!.albumName || "") : "orchestral."}</h1>
                   <h1>deep blue.</h1>
                   <h1>colors.</h1>
                   <h1>alone.</h1>
