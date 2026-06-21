@@ -293,10 +293,12 @@ body, html {
 #hero {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    padding: 0 4rem;
-    height: 100%;
+    align-items: center;
     width: 100%;
+    position: absolute;
+    top: 52%;
+    transform: translateY(-50%);
+    left: 0;
     color: #fff;
     pointer-events: none;
     transition: color 0.3s ease;
@@ -309,6 +311,7 @@ body, html {
 
 #heroleft {
     flex: 1;
+    min-width: 0; /* Ensures flex child can shrink for text-overflow */
 }
 
 #heroleft .elem {
@@ -332,7 +335,7 @@ body, html {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    width: 100%; /* Important for text-overflow to work */
+    width: 100%; /* Important for text-overflow to work in block elements */
 }
 
 /* Priority logic using flex-shrink */
