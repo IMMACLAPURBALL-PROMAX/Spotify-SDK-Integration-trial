@@ -121,56 +121,64 @@ const fragmentShader = /* glsl */ `
 
   void main() {
     vec2 uv = vUv;
+    float aspect = uResolution.x / uResolution.y;
 
-    // ── Noise distortion ──
-    float t = uTime * uNoiseSpeed;
-    float n = snoise(vec3(uv * uNoiseScale, t));
-    float n2 = snoise(vec3(uv * uNoiseScale * 0.5 + 100.0, t * 0.7));
+    // ── Shery.js exact logic: noise as alpha mask, NOT UV distortion ──
+    // Position in aspect-corrected space (matches Shery pos)
+    vec2 pos = vec2(uv.x, uv.y / aspect);
 
-    // Base distortion (continuous ambient wobble)
-    // Shery.js uses a very subtle internal multiplier; 0.003 matches it closely
-    vec2 distortion = vec2(
-      n * uNoiseHeight * 0.003 * uDistortA,
-      n2 * uNoiseHeight * 0.003 * uDistortB
-    );
+    // Noise value remapped to 0..1 (matches Shery noise calculation)
+    float noise = (snoise(vec3(pos * uNoiseScale, uTime * uNoiseSpeed)) + 1.0) / 2.0;
 
-    vec2 uv1 = coverUv(uv + distortion, uImageRes1, uResolution);
-    vec2 uv2 = coverUv(uv + distortion, uImageRes2, uResolution);
-    vec2 uv3 = coverUv(uv + distortion, uImageRes3, uResolution);
+    // Interpolated gooey parameters based on transition progress
+    // Shery.js: vec2 interpole = mix(vec2(0), vec2(metaball, noise_height), uIntercept);
+    float interpMetaball = uMetaball * uProgress;
+    float interpNoiseHeight = uNoiseHeight * uProgress;
+
+    // Base gooey value from noise
+    float val = noise * interpNoiseHeight;
+
+    // Mouse metaball: creates a bubble near cursor that reveals the next image
+    // Shery.js: float u = 1. - smoothstep(interpole.x, 0., distance(mouse, pos));
+    vec2 mouse = vec2(uMouse.x, uMouse.y / aspect);
+    float u = 1.0 - smoothstep(interpMetaball, 0.0, distance(mouse, pos));
+    float mouseMetaball = clamp(1.0 - u, 0.0, 1.0);
+    val += mouseMetaball;
+
+    // Alpha threshold (the gooey edge)
+    // Shery.js: float alpha = smoothstep(discard_threshold - antialias_threshold, discard_threshold, val);
+    float alpha = smoothstep(uDiscard - 0.002, uDiscard, val);
+
+    // Cover-fit UVs for each texture
+    vec2 uv1 = coverUv(uv, uImageRes1, uResolution);
+    vec2 uv2 = coverUv(uv, uImageRes2, uResolution);
 
     vec4 tex1 = texture2D(uTexture1, uv1);
     vec4 tex2 = texture2D(uTexture2, uv2);
-    vec4 tex3 = texture2D(uTexture3, uv3);
 
-    // ── Gooey transition blend ──
+    // Gooey blend: alpha controls how much of texture2 shows through
     vec4 baseColor;
     if (uProgress <= 0.0) {
       baseColor = tex1;
     } else if (uProgress >= 1.0) {
       baseColor = tex2;
     } else {
-      // Noise-driven metaball mask
-      float noiseVal = n * 0.5 + 0.5; // remap to 0..1
-      float grow = uProgress * uGrowSize;
-
-      // Soft threshold creates the blobby/organic edge
-      float mask = smoothstep(
-        uProgress - uMetaball * grow,
-        uProgress + uMetaball * grow,
-        noiseVal + (uv.x + uv.y) * 0.1
-      );
-      baseColor = mix(tex2, tex1, mask);
+      // Shery.js: return vec4(mix(texture2D(uTexture[0], uv), texture2D(uTexture[1], uv2), alpha));
+      baseColor = mix(tex1, tex2, alpha);
     }
 
-    // ── Hover Lens ──
+    // ── Hover Lens (queue preview) ──
+    // This is separate from the Shery gooey transition — it reveals texture3
+    // through a soft circular lens around the cursor
     if (uHover > 0.0) {
-      vec2 aspectUv = vec2(uv.x * (uResolution.x / uResolution.y), uv.y);
-      vec2 aspectMouse = vec2(uMouse.x * (uResolution.x / uResolution.y), uMouse.y);
-      float dist = distance(aspectUv, aspectMouse);
-      
-      float lensRadius = 0.12 * uHover;
-      float lensEdge = smoothstep(lensRadius - 0.03, lensRadius + 0.03, dist - n * 0.03);
-      
+      vec2 uv3 = coverUv(uv, uImageRes3, uResolution);
+      vec4 tex3 = texture2D(uTexture3, uv3);
+
+      float dist = distance(pos, mouse);
+      float lensRadius = 0.1 * uHover;
+      // Soft organic edge using noise
+      float lensEdge = smoothstep(lensRadius, lensRadius + 0.04, dist + noise * 0.02);
+
       gl_FragColor = mix(tex3, baseColor, lensEdge);
     } else {
       gl_FragColor = baseColor;
