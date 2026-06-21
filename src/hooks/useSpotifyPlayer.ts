@@ -33,6 +33,10 @@ export interface SpotifyPlayerState {
   deviceId: string | null;
   /** Whether the SDK is connected and ready. */
   isReady: boolean;
+  /** Current volume level (0.0 to 1.0). */
+  volume: number;
+  /** URL of the next track's album art in the queue (for hover preview). */
+  nextTrackArtUrl: string | null;
 }
 
 export interface SpotifyPlayerControls {
@@ -40,6 +44,7 @@ export interface SpotifyPlayerControls {
   skipToPrevious: () => Promise<void>;
   togglePlay: () => Promise<void>;
   seek: (positionMs: number) => Promise<void>;
+  setVolume: (volume: number) => Promise<void>;
 }
 
 // Load the SDK script once globally
@@ -78,6 +83,8 @@ export function useSpotifyPlayer(): {
     positionMs: 0,
     deviceId: null,
     isReady: false,
+    volume: 0.5,
+    nextTrackArtUrl: null,
   });
 
   // Extract track info from the SDK state object
@@ -162,24 +169,31 @@ export function useSpotifyPlayer(): {
         setState((prev) => ({ ...prev, isReady: false }));
       });
 
-      // ── Playback state changes ──
-      player.addListener("player_state_changed", (sdkState) => {
-        if (!sdkState) {
-          setState((prev) => ({
-            ...prev,
-            currentTrack: null,
-            isPaused: true,
-            positionMs: 0,
-          }));
+      // ── State Change ──
+      player.addListener("player_state_changed", (playerState) => {
+        if (!playerState) {
+          setState((prev) => ({ ...prev, currentTrack: null, nextTrackArtUrl: null }));
           return;
         }
 
-        const track = sdkState.track_window.current_track;
+        const trackInfo = extractTrackInfo(playerState.track_window.current_track);
+        
+        // Find the next track's art url
+        const nextTracks = playerState.track_window.next_tracks;
+        let nextArtUrl = null;
+        if (nextTracks && nextTracks.length > 0) {
+          const imgs = nextTracks[0].album.images;
+          if (imgs && imgs.length > 0) {
+            nextArtUrl = imgs[0].url;
+          }
+        }
+
         setState((prev) => ({
           ...prev,
-          currentTrack: extractTrackInfo(track),
-          isPaused: sdkState.paused,
-          positionMs: sdkState.position,
+          currentTrack: trackInfo,
+          isPaused: playerState.paused,
+          positionMs: playerState.position,
+          nextTrackArtUrl: nextArtUrl,
         }));
       });
 
@@ -228,8 +242,15 @@ export function useSpotifyPlayer(): {
     }
   }, []);
 
+  const setVolume = useCallback(async (volume: number) => {
+    if (playerRef.current) {
+      await playerRef.current.setVolume(volume);
+      setState((prev) => ({ ...prev, volume }));
+    }
+  }, []);
+
   return {
     state,
-    controls: { skipToNext, skipToPrevious, togglePlay, seek },
+    controls: { skipToNext, skipToPrevious, togglePlay, seek, setVolume },
   };
 }

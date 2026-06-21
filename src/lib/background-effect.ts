@@ -34,11 +34,15 @@ const fragmentShader = /* glsl */ `
 
   uniform sampler2D uTexture1;
   uniform sampler2D uTexture2;
+  uniform sampler2D uTexture3;   // Hover preview texture
   uniform float uProgress;       // 0 = show texture1, 1 = show texture2
+  uniform float uHover;          // 0 = no hover, 1 = show hover lens
+  uniform vec2 uMouse;           // Normalized mouse position
   uniform float uTime;
   uniform vec2 uResolution;      // viewport size
   uniform vec2 uImageRes1;       // texture1 natural dimensions
   uniform vec2 uImageRes2;       // texture2 natural dimensions
+  uniform vec2 uImageRes3;       // texture3 natural dimensions
 
   // Effect tuning uniforms (mapped from original Shery config)
   uniform float uNoiseSpeed;     // noise_speed
@@ -131,15 +135,18 @@ const fragmentShader = /* glsl */ `
 
     vec2 uv1 = coverUv(uv + distortion, uImageRes1, uResolution);
     vec2 uv2 = coverUv(uv + distortion, uImageRes2, uResolution);
+    vec2 uv3 = coverUv(uv + distortion, uImageRes3, uResolution);
 
     vec4 tex1 = texture2D(uTexture1, uv1);
     vec4 tex2 = texture2D(uTexture2, uv2);
+    vec4 tex3 = texture2D(uTexture3, uv3);
 
     // ── Gooey transition blend ──
+    vec4 baseColor;
     if (uProgress <= 0.0) {
-      gl_FragColor = tex1;
+      baseColor = tex1;
     } else if (uProgress >= 1.0) {
-      gl_FragColor = tex2;
+      baseColor = tex2;
     } else {
       // Noise-driven metaball mask
       float noiseVal = n * 0.5 + 0.5; // remap to 0..1
@@ -149,15 +156,23 @@ const fragmentShader = /* glsl */ `
       float mask = smoothstep(
         uProgress - uMetaball * grow,
         uProgress + uMetaball * grow,
-        noiseVal
+        noiseVal + (uv.x + uv.y) * 0.1
       );
+      baseColor = mix(tex2, tex1, mask);
+    }
 
-      // Edge discard for that punchy gooey look
-      float edge = abs(noiseVal - uProgress);
-      float alpha = smoothstep(0.0, uDiscard, edge + (1.0 - uProgress) * 0.5);
-
-      vec4 mixed = mix(tex2, tex1, mask);
-      gl_FragColor = vec4(mixed.rgb, mixed.a * max(alpha, 0.3));
+    // ── Hover Lens ──
+    if (uHover > 0.0) {
+      vec2 aspectUv = vec2(uv.x * (uResolution.x / uResolution.y), uv.y);
+      vec2 aspectMouse = vec2(uMouse.x * (uResolution.x / uResolution.y), uMouse.y);
+      float dist = distance(aspectUv, aspectMouse);
+      
+      float lensRadius = 0.25 * uHover;
+      float lensEdge = smoothstep(lensRadius - 0.05, lensRadius + 0.05, dist - n * 0.08);
+      
+      gl_FragColor = mix(tex3, baseColor, lensEdge);
+    } else {
+      gl_FragColor = baseColor;
     }
   }
 `;
@@ -176,12 +191,12 @@ export class BackgroundEffect {
   private animationId: number = 0;
   private container: HTMLElement;
 
-  // The two texture slots for transitions
+  // The texture slots
   private texture1: THREE.Texture | null = null;
   private texture2: THREE.Texture | null = null;
-  private loader: THREE.TextureLoader;
+  private texture3: THREE.Texture | null = null;
 
-  // Transition state
+  private loader: THREE.TextureLoader;
   private isTransitioning = false;
 
   constructor(container: HTMLElement) {
@@ -190,7 +205,6 @@ export class BackgroundEffect {
     this.loader = new THREE.TextureLoader();
     this.loader.setCrossOrigin("anonymous");
 
-    // Renderer — fills the container
     this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(container.clientWidth, container.clientHeight);
@@ -201,28 +215,26 @@ export class BackgroundEffect {
     this.renderer.domElement.style.height = "100%";
     container.appendChild(this.renderer.domElement);
 
-    // Orthographic camera for full-screen quad
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-
-    // Scene + full-screen plane
     this.scene = new THREE.Scene();
-
-    const defaultTex = new THREE.Texture();
 
     this.material = new THREE.ShaderMaterial({
       vertexShader,
       fragmentShader,
       uniforms: {
-        uTexture1: { value: defaultTex },
-        uTexture2: { value: defaultTex },
+        uTexture1: { value: null },
+        uTexture2: { value: null },
+        uTexture3: { value: null },
         uProgress: { value: 0.0 },
+        uHover: { value: 0.0 },
+        uMouse: { value: new THREE.Vector2(0.5, 0.5) },
         uTime: { value: 0.0 },
         uResolution: {
           value: new THREE.Vector2(container.clientWidth, container.clientHeight),
         },
         uImageRes1: { value: new THREE.Vector2(1, 1) },
         uImageRes2: { value: new THREE.Vector2(1, 1) },
-        // Effect params — matched to original Shery config
+        uImageRes3: { value: new THREE.Vector2(1, 1) },
         uNoiseSpeed: { value: 0.2 },
         uNoiseScale: { value: 10.69 },
         uNoiseHeight: { value: 0.44 },
@@ -239,18 +251,14 @@ export class BackgroundEffect {
     this.mesh = new THREE.Mesh(geometry, this.material);
     this.scene.add(this.mesh);
 
-    // Resize handler
     window.addEventListener("resize", this.onResize);
+    this.container.addEventListener("mousemove", this.onMouseMove);
+    this.container.addEventListener("mouseenter", this.onMouseEnter);
+    this.container.addEventListener("mouseleave", this.onMouseLeave);
 
-    // Start render loop
     this.animate();
   }
 
-  // ── Public API ──
-
-  /**
-   * Load an image and display it immediately (no transition).
-   */
   async setImage(url: string): Promise<void> {
     const tex = await this.loadTexture(url);
     if (this.texture1) this.texture1.dispose();
@@ -263,10 +271,6 @@ export class BackgroundEffect {
     this.material.uniforms.uProgress.value = 0.0;
   }
 
-  /**
-   * Smoothly transition from the current image to a new one with the
-   * gooey/liquid morph effect.
-   */
   async transitionTo(url: string, duration = 1.5): Promise<void> {
     if (this.isTransitioning) return;
 
@@ -289,7 +293,6 @@ export class BackgroundEffect {
           duration,
           ease: "power2.inOut",
           onComplete: () => {
-            // Swap: texture2 becomes the new texture1
             if (this.texture1) this.texture1.dispose();
             this.texture1 = this.texture2;
             this.texture2 = null;
@@ -309,15 +312,29 @@ export class BackgroundEffect {
     });
   }
 
-  /**
-   * Clean up all WebGL resources.
-   */
+  public async setHoverTexture(url: string | null): Promise<void> {
+    if (!url) {
+      this.texture3 = null;
+      this.material.uniforms.uTexture3.value = null;
+      return;
+    }
+    const tex = await this.loadTexture(url);
+    if (this.texture3) this.texture3.dispose();
+    this.texture3 = tex;
+    this.material.uniforms.uTexture3.value = tex;
+    this.material.uniforms.uImageRes3.value.set((tex.image as any)?.width || 1024, (tex.image as any)?.height || 1024);
+  }
+
   dispose(): void {
     cancelAnimationFrame(this.animationId);
     window.removeEventListener("resize", this.onResize);
+    this.container.removeEventListener("mousemove", this.onMouseMove);
+    this.container.removeEventListener("mouseenter", this.onMouseEnter);
+    this.container.removeEventListener("mouseleave", this.onMouseLeave);
 
     this.texture1?.dispose();
     this.texture2?.dispose();
+    this.texture3?.dispose();
     this.mesh.geometry.dispose();
     this.material.dispose();
     this.renderer.dispose();
@@ -327,24 +344,14 @@ export class BackgroundEffect {
     }
   }
 
-  // ── Internals ──
-
   private loadTexture(url: string): Promise<THREE.Texture> {
     return new Promise((resolve, reject) => {
-      this.loader.load(
-        url,
-        (tex) => {
-          tex.minFilter = THREE.LinearFilter;
-          tex.magFilter = THREE.LinearFilter;
-          tex.generateMipmaps = false;
-          resolve(tex);
-        },
-        undefined,
-        (err) => {
-          console.error("[BackgroundEffect] Failed to load texture:", url, err);
-          reject(err);
-        }
-      );
+      this.loader.load(url, (tex) => {
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        tex.generateMipmaps = false;
+        resolve(tex);
+      }, undefined, reject);
     });
   }
 
@@ -352,6 +359,23 @@ export class BackgroundEffect {
     this.animationId = requestAnimationFrame(this.animate);
     this.material.uniforms.uTime.value = this.clock.getElapsedTime();
     this.renderer.render(this.scene, this.camera);
+  };
+
+  private onMouseMove = (e: MouseEvent) => {
+    const rect = this.container.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = 1.0 - ((e.clientY - rect.top) / rect.height);
+    this.material.uniforms.uMouse.value.set(x, y);
+  };
+
+  private onMouseEnter = () => {
+    if (this.texture3) {
+      gsap.to(this.material.uniforms.uHover, { value: 1, duration: 0.5, ease: "power2.out" });
+    }
+  };
+
+  private onMouseLeave = () => {
+    gsap.to(this.material.uniforms.uHover, { value: 0, duration: 0.5, ease: "power2.in" });
   };
 
   private onResize = (): void => {

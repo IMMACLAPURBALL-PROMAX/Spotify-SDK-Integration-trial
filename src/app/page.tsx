@@ -70,6 +70,7 @@ export default function Home() {
     const fx = new BackgroundEffect(backRef.current);
     bgEffectRef.current = fx;
     fx.setImage(STATIC_IMAGES[0]);
+    fx.setHoverTexture(STATIC_IMAGES[1]);
 
     return () => {
       fx.dispose();
@@ -83,6 +84,9 @@ export default function Home() {
 
     const trackId = playerState.currentTrack.id;
     const artUrl = playerState.currentTrack.albumArtUrl;
+
+    // Always update the hover lens for the queue
+    bgEffectRef.current.setHoverTexture(playerState.nextTrackArtUrl);
 
     if (trackId !== lastTrackIdRef.current && artUrl) {
       if (lastTrackIdRef.current === null) {
@@ -111,6 +115,11 @@ export default function Home() {
 
     const currentIndex = masterIndexRef.current;
     const nextIndex = (currentIndex + 1) % totalSlides;
+
+    // In static mode, set the hover lens to preview the next static slide
+    if (!isSpotifyActive && bgEffectRef.current) {
+      bgEffectRef.current.setHoverTexture(STATIC_IMAGES[(nextIndex + 1) % totalSlides]);
+    }
 
     // 1. Text rolling animation
     elems.forEach((elem) => {
@@ -210,6 +219,7 @@ export default function Home() {
       lastTrackIdRef.current = null;
       if (bgEffectRef.current) {
         bgEffectRef.current.setImage(STATIC_IMAGES[0]);
+        bgEffectRef.current.setHoverTexture(STATIC_IMAGES[1]);
         masterIndexRef.current = 0;
       }
     } else {
@@ -250,7 +260,20 @@ export default function Home() {
                 <a href="#"><span>Visuals</span></a>
               </div>
               <div id="nright">
-                <a href="#"><span>Audio</span></a>
+                <div className="audio-wrapper">
+                  <span className="audio-text" style={{ textDecoration: playerState.volume === 0 ? "line-through" : "none" }}>Audio</span>
+                  <div className="volume-slider-container">
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="1" 
+                      step="0.01" 
+                      value={playerState.volume ?? 0.5} 
+                      onChange={(e) => controls.setVolume(parseFloat(e.target.value))}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                </div>
                 <a href="#" onClick={handlePremiumClick}>
                   <span>{isLoggedIn ? "Connected ✓" : "Premium"}</span>
                 </a>
@@ -324,9 +347,13 @@ export default function Home() {
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
                   </button>
 
-                  <button className="control-btn master-play" id="play-trigger" aria-label="Play Track"
+                  <button className="control-btn master-play" id="play-trigger" aria-label={playerState.isPaused ? "Play Track" : "Pause Track"}
                     onClick={(e) => { e.stopPropagation(); if (isSpotifyActive) controls.togglePlay(); }}>
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                    {playerState.isPaused ? (
+                      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+                    )}
                   </button>
 
                   <button className="control-btn" id="next-track" aria-label="Next Track"

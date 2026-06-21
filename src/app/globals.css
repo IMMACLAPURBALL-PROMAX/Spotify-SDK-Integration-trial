@@ -100,17 +100,79 @@ body, html {
     font-weight: 700; /* Bumped weight slightly for better readability over green */
     text-transform: uppercase;
     letter-spacing: 2px;
-
     position: relative;
-    padding: 8px 16px; /* Added breathing room inside the pill bounding box */
-    border-radius: 100px; /* Pre-rounds the capsule profile */
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden; /* Clips the background slider perfectly to the pill boundaries */
-
     transition: color 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
+
+#nav a:hover {
+    color: #fff; /* Ignites to pure white when interacted with */
+}
+
+/* ==========================================
+   VOLUME CONTROL (Audio Hover)
+   ========================================== */
+.audio-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    width: 80px; /* Fixed width to prevent layout shift */
+    height: 20px;
+}
+
+.audio-text {
+    transition: opacity 0.3s ease;
+    display: inline-block;
+    position: absolute;
+    left: 0;
+}
+
+.volume-slider-container {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    display: flex;
+    align-items: center;
+    height: 100%;
+}
+
+.audio-wrapper:hover .audio-text {
+    opacity: 0;
+}
+
+.audio-wrapper:hover .volume-slider-container {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.volume-slider-container input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+}
+
+.volume-slider-container input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+}
+
+.volume-slider-container input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 12px;
+    width: 12px;
+    border-radius: 50%;
+    background: #fff;
+    margin-top: -4px;
+    cursor: pointer;
+}
+
 
 /* Ensure link text stays layered above the incoming background fill */
 #nav a span {
