@@ -130,11 +130,12 @@ const fragmentShader = /* glsl */ `
     float noise = (snoise(vec3(pos * uNoiseScale, uTime * uNoiseSpeed)) + 1.0) / 2.0;
 
     // Ambient liquid wobble on UVs (always active, gives the background life)
-    float wN1 = snoise(vec3(uv * uNoiseScale * 0.8, uTime * uNoiseSpeed * 0.6));
-    float wN2 = snoise(vec3(uv * uNoiseScale * 0.5 + 50.0, uTime * uNoiseSpeed * 0.4));
+    // Directly driven by uNoiseScale, uNoiseSpeed, uDistortA, and uDistortB
+    float wN1 = snoise(vec3(uv * uNoiseScale, uTime * uNoiseSpeed));
+    float wN2 = snoise(vec3(uv * uNoiseScale + 50.0, uTime * uNoiseSpeed));
     vec2 wobble = vec2(
-      wN1 * 0.02 * uDistortA,
-      wN2 * 0.02 * uDistortB
+      wN1 * 0.01 * uDistortA,
+      wN2 * 0.01 * uDistortB
     );
 
     // Gooey transition alpha mask
@@ -176,20 +177,20 @@ const fragmentShader = /* glsl */ `
       float dist = length(mouseDir);
       float angle = atan(mouseDir.y, mouseDir.x);
       
-      // Time-based rotation for the amoeba blob (slowed down from 0.4 to 0.1)
-      float spinAngle = angle + uTime * 0.1;
+      // Time-based rotation for the amoeba blob (driven by uNoiseSpeed)
+      float spinAngle = angle + uTime * (uNoiseSpeed * 0.5);
       
-      // Noise displacement to create continuous organic morphing (slowed down from 0.25 to 0.08)
-      float blobNoise = snoise(vec3(cos(spinAngle)*1.5, sin(spinAngle)*1.5, uTime * 0.08));
+      // Noise displacement to create continuous organic morphing (driven by uNoiseScale and uNoiseSpeed)
+      float blobNoise = snoise(vec3(cos(spinAngle) * (uNoiseScale * 0.14), sin(spinAngle) * (uNoiseScale * 0.14), uTime * (uNoiseSpeed * 0.4)));
       
-      // Dynamic radius based on hover state and noise (reduced size from 0.18+0.07 to 0.12+0.03)
-      float dynamicRadius = (0.12 + blobNoise * 0.03) * uHover;
+      // Dynamic radius based on hover state and noise (driven by uDistortA)
+      float dynamicRadius = (0.12 + blobNoise * 0.02 * uDistortA) * uHover;
       
       // Smooth liquid edge
       float lensEdge = smoothstep(dynamicRadius, dynamicRadius + 0.03, dist);
 
-      // Liquid Refraction: distort the UVs for a magnifying glass effect
-      vec2 refractUv = uv + mouseDir * (1.0 - lensEdge) * 0.12 * uHover;
+      // Liquid Refraction: distort the UVs for a magnifying glass effect (driven by uDistortB)
+      vec2 refractUv = uv + mouseDir * (1.0 - lensEdge) * (0.13 * abs(uDistortB)) * uHover;
       
       vec2 uv3 = coverUv(refractUv, uImageRes3, uResolution);
       vec4 tex3 = texture2D(uTexture3, uv3);
