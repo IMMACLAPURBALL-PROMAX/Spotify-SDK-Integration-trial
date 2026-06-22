@@ -45,6 +45,10 @@ export default function Home() {
   const masterIndexRef = useRef(0);
   const animatingRef = useRef(false);
 
+  // Playback slider dragging state
+  const [isDraggingProgress, setIsDraggingProgress] = useState(false);
+  const [dragProgressMs, setDragProgressMs] = useState(0);
+
   const { state: playerState, controls } = useSpotifyPlayer();
   const isSpotifyActive = isLoggedIn && playerState.isReady && playerState.currentTrack !== null;
   const brightness = useImageBrightness(playerState.currentTrack?.albumArtUrl || STATIC_IMAGES[0]);
@@ -139,8 +143,10 @@ export default function Home() {
             : "";
           h1s[nextIndex].textContent = newTrackData.primaryArtist + featText;
         } else if (colIndex === 2) {
-          // Column 3: Album Name
-          h1s[nextIndex].textContent = newTrackData.albumName || "";
+          // Column 3: Album Name (prevent duplicates for Singles)
+          const isSingle = newTrackData.albumName && newTrackData.name &&
+            newTrackData.albumName.toLowerCase() === newTrackData.name.toLowerCase();
+          h1s[nextIndex].textContent = isSingle ? "Single" : (newTrackData.albumName || "");
         }
       }
 
@@ -201,7 +207,7 @@ export default function Home() {
           if (artistEl) artistEl.innerText = artist;
           if (ts1) ts1.innerText = timeStart;
           if (ts2) ts2.innerText = timeEnd;
-          gsap.to(".progress-bar-fill", { width: progressWidth, duration: 0.4, ease: "power1.out" });
+          gsap.to(".progress-slider", { backgroundSize: progressWidth, duration: 0.4, ease: "power1.out" });
         },
       }, "<")
       .to([".track-title", ".artist-name", ".time-stamp:first-child", ".time-stamp:last-child"], {
@@ -251,20 +257,60 @@ export default function Home() {
     }
   };
 
-  // ── Derived dynamic labels ──
-  // For Spotify mode, we update the progress bar and current time continuously via React.
-  // The Track Title and Artist are updated by GSAP to match the slide animation timing!
+  // ── Autoplay slideshow in static mode ──
   useEffect(() => {
-    if (isSpotifyActive && playerState.currentTrack) {
-      const ts1 = document.querySelector(".playback-timeline .time-stamp:first-child") as HTMLElement;
-      if (ts1) ts1.innerText = formatMs(playerState.positionMs);
-      const progressPercent = `${Math.round((playerState.positionMs / playerState.currentTrack.durationMs) * 100)}%`;
-      const fill = document.querySelector(".progress-bar-fill") as HTMLElement;
-      if (fill && !animatingRef.current) {
-        fill.style.width = progressPercent;
+    if (isSpotifyActive) return;
+
+    const interval = setInterval(() => {
+      if (animatingRef.current) return;
+      const nextIndex = (masterIndexRef.current + 1) % 5;
+      if (bgEffectRef.current) {
+        bgEffectRef.current.transitionTo(STATIC_IMAGES[nextIndex], 1.5);
       }
+      runGsapTransition(null, null);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [isSpotifyActive]);
+
+  // ── Playback slider seek event handlers ──
+  const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseInt(e.target.value);
+    setDragProgressMs(val);
+    if (!isDraggingProgress) {
+      setIsDraggingProgress(true);
     }
-  }, [isSpotifyActive, playerState.positionMs, playerState.currentTrack]);
+  };
+
+  const handleProgressMouseDown = () => {
+    setIsDraggingProgress(true);
+    setDragProgressMs(isSpotifyActive && playerState.currentTrack ? playerState.positionMs : 0);
+  };
+
+  const handleProgressMouseUp = () => {
+    setIsDraggingProgress(false);
+    if (isSpotifyActive) {
+      controls.seek(dragProgressMs);
+    }
+  };
+
+  // ── Playback timeline binding calculations ──
+  const maxDurationMs = isSpotifyActive && playerState.currentTrack ? playerState.currentTrack.durationMs : 182000;
+  const currentPosMs = isDraggingProgress 
+    ? dragProgressMs 
+    : (isSpotifyActive ? playerState.positionMs : 0);
+
+  const displayProgressPercent = isSpotifyActive
+    ? `${(currentPosMs / maxDurationMs) * 100}%`
+    : (STATIC_TRACK_DATA[masterIndexRef.current]?.progress || "0%");
+
+  const displayTimeStart = isSpotifyActive
+    ? formatMs(currentPosMs)
+    : (STATIC_TRACK_DATA[masterIndexRef.current]?.time || "0:00");
+
+  const displayTimeEnd = isSpotifyActive && playerState.currentTrack
+    ? formatMs(playerState.currentTrack.durationMs)
+    : (STATIC_TRACK_DATA[masterIndexRef.current]?.duration || "3:02");
 
   const nowPlayingLabel = isSpotifyActive
     ? (playerState.isPaused ? "PAUSED" : "NOW PLAYING")
@@ -326,7 +372,7 @@ export default function Home() {
                 </div>
                 {/* Column 3: Album name */}
                 <div className="elem">
-                  <h1>{isSpotifyActive ? (playerState.currentTrack!.albumName || "") : "orchestral."}</h1>
+                  <h1>{isSpotifyActive ? (playerState.currentTrack!.albumName.toLowerCase() === playerState.currentTrack!.name.toLowerCase() ? "Single" : playerState.currentTrack!.albumName) : "orchestral."}</h1>
                   <h1>deep blue.</h1>
                   <h1>colors.</h1>
                   <h1>alone.</h1>
@@ -358,12 +404,24 @@ export default function Home() {
                   <p className="artist-name">Billie Eilish</p>
                 </div>
 
-                <div className="playback-timeline">
-                  <span className="time-stamp" id="current-time">0:00</span>
-                  <div className="progress-bar-container">
-                    <div className="progress-bar-fill"></div>
+                <div className="playback-timeline" onClick={e => e.stopPropagation()}>
+                  <span className="time-stamp">{displayTimeStart}</span>
+                  <div className="progress-slider-container">
+                    <input 
+                      type="range"
+                      className="progress-slider"
+                      min="0"
+                      max={maxDurationMs}
+                      value={currentPosMs}
+                      style={{ backgroundSize: `${displayProgressPercent} 100%` }}
+                      onChange={handleProgressChange}
+                      onMouseDown={handleProgressMouseDown}
+                      onMouseUp={handleProgressMouseUp}
+                      onTouchStart={handleProgressMouseDown}
+                      onTouchEnd={handleProgressMouseUp}
+                    />
                   </div>
-                  <span className="time-stamp" id="total-time">3:02</span>
+                  <span className="time-stamp">{displayTimeEnd}</span>
                 </div>
 
                 <div className="player-controls">
@@ -397,10 +455,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <div id="footer-collab">
-            <span className="collab-tag">In Collaboration With</span>
-            <img src="/images/billie_signature.png" alt="Billie Eilish Signature Logo" className="collab-logo" />
-          </div>
+          {/* Leftover footer collaboration block removed */}
         </div>
       </div>
     </>

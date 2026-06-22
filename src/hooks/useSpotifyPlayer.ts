@@ -251,6 +251,24 @@ export function useSpotifyPlayer(): {
     }
   }, []);
 
+  // Smooth position ticking interval (every 100ms) during active playback
+  useEffect(() => {
+    if (state.isPaused || !state.currentTrack) return;
+
+    const interval = setInterval(() => {
+      setState((prev) => {
+        if (prev.isPaused || !prev.currentTrack) return prev;
+        const newPos = prev.positionMs + 100;
+        return {
+          ...prev,
+          positionMs: Math.min(newPos, prev.currentTrack.durationMs),
+        };
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [state.isPaused, state.currentTrack?.id]);
+
   return {
     state,
     controls: { skipToNext, skipToPrevious, togglePlay, seek, setVolume },

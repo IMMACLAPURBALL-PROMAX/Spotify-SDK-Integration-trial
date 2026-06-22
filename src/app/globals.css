@@ -528,31 +528,79 @@ body, html {
     min-width: 25px;
 }
 
-.playback-timeline .progress-bar-container {
+.playback-timeline .progress-slider-container {
     flex-grow: 1;
+    display: flex;
+    align-items: center;
+    position: relative;
+    cursor: pointer;
+}
+
+.playback-timeline .progress-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
     height: 4px;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 10px;
-    position: relative;
+    outline: none;
     cursor: pointer;
+    background-image: linear-gradient(#ffffff, #ffffff);
+    background-repeat: no-repeat;
     transition: height 0.1s ease;
 }
 
-.playback-timeline .progress-bar-fill {
-    width: 25%; /* Simulated playback track placement */
+.playback-timeline .progress-slider:hover {
+    height: 6px;
+    background-image: linear-gradient(#1DB954, #1DB954);
+}
+
+/* Chrome, Safari, Opera and Edge */
+.playback-timeline .progress-slider::-webkit-slider-runnable-track {
+    width: 100%;
     height: 100%;
-    background-color: #ffffff; /* Default progress bar color */
-    border-radius: 10px;
-    transition: background-color 0.1s ease;
+    background: transparent;
+    border: none;
 }
 
-/* Hovering turns the track timeline green, just like Spotify */
-.progress-bar-container:hover {
-    height: 6px; /* Thickens up on mouse approach */
+.playback-timeline .progress-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 12px;
+    width: 12px;
+    border-radius: 50%;
+    background: #ffffff;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+    margin-top: -4px; /* Align center */
 }
 
-.progress-bar-container:hover .progress-bar-fill {
-    background-color: #1DB954;
+.playback-timeline .progress-slider:hover::-webkit-slider-thumb {
+    opacity: 1;
+}
+
+/* Firefox */
+.playback-timeline .progress-slider::-moz-range-track {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+}
+
+.playback-timeline .progress-slider::-moz-range-thumb {
+    height: 12px;
+    width: 12px;
+    border: none;
+    border-radius: 50%;
+    background: #ffffff;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+}
+
+.playback-timeline .progress-slider:hover::-moz-range-thumb {
+    opacity: 1;
 }
 
 /* ==========================================
