@@ -7,7 +7,7 @@ import {
   getStoredAccessToken,
   clearSpotifyAuth,
 } from "@/lib/spotify-auth";
-import { BackgroundEffect } from "@/lib/background-effect";
+import { LiquidBackground } from "@/components/LiquidBackground";
 import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
 import { useImageBrightness } from "@/hooks/useImageBrightness";
 
@@ -37,8 +37,8 @@ function formatMs(ms: number): string {
 
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const backRef = useRef<HTMLDivElement>(null);
-  const bgEffectRef = useRef<BackgroundEffect | null>(null);
+  const [mood, setMood] = useState<"chill" | "energy" | "focus">("chill");
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
   // Animation and track state
   const lastTrackIdRef = useRef<string | null>(null);
@@ -69,41 +69,21 @@ export default function Home() {
     }
   }, []);
 
-  // ── Initialize Three.js background effect ──
-  useEffect(() => {
-    if (!backRef.current) return;
-
-    const fx = new BackgroundEffect(backRef.current);
-    bgEffectRef.current = fx;
-    fx.setImage(STATIC_IMAGES[0]);
-    fx.setHoverTexture(STATIC_IMAGES[1]);
-
-    return () => {
-      fx.dispose();
-      bgEffectRef.current = null;
-    };
-  }, []);
-
   // ── Sync background & trigger GSAP on Spotify track changes ──
   useEffect(() => {
-    if (!isSpotifyActive || !bgEffectRef.current || !playerState.currentTrack) return;
+    if (!isSpotifyActive || !playerState.currentTrack) return;
 
     const trackId = playerState.currentTrack.id;
     const artUrl = playerState.currentTrack.albumArtUrl;
 
-    // Always update the hover lens for the queue
-    bgEffectRef.current.setHoverTexture(playerState.nextTrackArtUrl);
-
     if (trackId !== lastTrackIdRef.current && artUrl) {
       if (lastTrackIdRef.current === null) {
         // First track loaded, no GSAP transition needed yet
-        bgEffectRef.current.setImage(artUrl);
         // Also update the active card image manually for the first load
         const activeCard = document.querySelector(".album-card.active") as HTMLImageElement;
         if (activeCard) activeCard.src = artUrl;
       } else {
         // Track changed! Run GSAP transition visually.
-        bgEffectRef.current.transitionTo(artUrl, 1.5);
         runGsapTransition(artUrl, playerState.currentTrack);
       }
       lastTrackIdRef.current = trackId;
@@ -121,11 +101,6 @@ export default function Home() {
 
     const currentIndex = masterIndexRef.current;
     const nextIndex = (currentIndex + 1) % totalSlides;
-
-    // In static mode, set the hover lens to preview the next static slide
-    if (!isSpotifyActive && bgEffectRef.current) {
-      bgEffectRef.current.setHoverTexture(STATIC_IMAGES[(nextIndex + 1) % totalSlides]);
-    }
 
     // 1. Text rolling animation
     elems.forEach((elem, colIndex) => {
@@ -219,8 +194,8 @@ export default function Home() {
           onStart: () => incoming.classList.add("active"),
         }, "-=0.2"
       );
-
     masterIndexRef.current = nextIndex;
+    setCurrentSlideIndex(nextIndex);
   };
 
   // ── Main click handler ──
@@ -231,10 +206,6 @@ export default function Home() {
       controls.skipToNext();
     } else {
       // Static mode: trigger transition immediately
-      const nextIndex = (masterIndexRef.current + 1) % 5;
-      if (bgEffectRef.current) {
-        bgEffectRef.current.transitionTo(STATIC_IMAGES[nextIndex], 1.5);
-      }
       runGsapTransition(null, null);
     }
   }, [isSpotifyActive, controls]);
@@ -247,11 +218,8 @@ export default function Home() {
       clearSpotifyAuth();
       setIsLoggedIn(false);
       lastTrackIdRef.current = null;
-      if (bgEffectRef.current) {
-        bgEffectRef.current.setImage(STATIC_IMAGES[0]);
-        bgEffectRef.current.setHoverTexture(STATIC_IMAGES[1]);
-        masterIndexRef.current = 0;
-      }
+      masterIndexRef.current = 0;
+      setCurrentSlideIndex(0);
     } else {
       redirectToSpotifyLogin();
     }
@@ -263,10 +231,6 @@ export default function Home() {
 
     const interval = setInterval(() => {
       if (animatingRef.current) return;
-      const nextIndex = (masterIndexRef.current + 1) % 5;
-      if (bgEffectRef.current) {
-        bgEffectRef.current.transitionTo(STATIC_IMAGES[nextIndex], 1.5);
-      }
       runGsapTransition(null, null);
     }, 5000);
 
@@ -302,31 +266,52 @@ export default function Home() {
 
   const displayProgressPercent = isSpotifyActive
     ? `${(currentPosMs / maxDurationMs) * 100}%`
-    : (STATIC_TRACK_DATA[masterIndexRef.current]?.progress || "0%");
+    : (STATIC_TRACK_DATA[currentSlideIndex]?.progress || "0%");
 
   const displayTimeStart = isSpotifyActive
     ? formatMs(currentPosMs)
-    : (STATIC_TRACK_DATA[masterIndexRef.current]?.time || "0:00");
+    : (STATIC_TRACK_DATA[currentSlideIndex]?.time || "0:00");
 
   const displayTimeEnd = isSpotifyActive && playerState.currentTrack
     ? formatMs(playerState.currentTrack.durationMs)
-    : (STATIC_TRACK_DATA[masterIndexRef.current]?.duration || "3:02");
+    : (STATIC_TRACK_DATA[currentSlideIndex]?.duration || "3:02");
 
   const nowPlayingLabel = isSpotifyActive
     ? (playerState.isPaused ? "PAUSED" : "NOW PLAYING")
     : "NOW PLAYING";
 
+  const currentBgUrl = isSpotifyActive && playerState.currentTrack?.albumArtUrl
+    ? playerState.currentTrack.albumArtUrl
+    : STATIC_IMAGES[currentSlideIndex];
+
+  const nextBgUrl = isSpotifyActive
+    ? playerState.nextTrackArtUrl
+    : STATIC_IMAGES[(currentSlideIndex + 1) % 5];
+
   return (
     <>
       <div id="main" onClick={handleMainClick}>
-        <div id="back" ref={backRef} />
+        <LiquidBackground
+          currentTrackUrl={currentBgUrl}
+          hoverTrackUrl={nextBgUrl}
+          mood={mood}
+        />
 
         <div id="top">
           <div id="workingarea">
             <div id="nav" className={brightness.navIsLight ? "force-pill" : ""}>
               <div id="nleft">
                 <img src="/images/Spotifylogo.png" alt="Spotify Logo" />
-                <a href="#"><span>Soundscapes</span></a>
+                <div className="mood-dropdown" onClick={(e) => e.stopPropagation()}>
+                  <button className="mood-dropbtn">
+                    <span>Mood: {mood}</span>
+                  </button>
+                  <div className="mood-dropdown-content">
+                    <button onClick={() => setMood("chill")}>✨ Chill</button>
+                    <button onClick={() => setMood("energy")}>⚡ Energy</button>
+                    <button onClick={() => setMood("focus")}>👁️ Focus</button>
+                  </div>
+                </div>
                 <a href="#"><span>Visuals</span></a>
               </div>
               <div id="nright">

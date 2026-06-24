@@ -818,3 +818,113 @@ body, html {
         height: 28px; /* Scale down script size for mobile display aesthetics */
     }
 }
+
+/* ==========================================
+   MOOD DROPDOWN MENU
+   ========================================== */
+.mood-dropdown {
+    position: relative;
+    display: inline-block;
+    pointer-events: all;
+}
+
+.mood-dropbtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.65); /* Faded silver white */
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    position: relative;
+    padding: 8px 16px;
+    border-radius: 100px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    transition: color 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.mood-dropbtn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1DB954;
+    z-index: 1;
+    transform: scaleX(0);
+    transform-origin: left;
+    border-radius: 100px;
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.3, 1);
+}
+
+.mood-dropbtn span {
+    position: relative;
+    z-index: 2;
+}
+
+.mood-dropdown:hover .mood-dropbtn,
+#nav.force-pill .mood-dropbtn {
+    color: #000;
+}
+
+.mood-dropdown:hover .mood-dropbtn::before,
+#nav.force-pill .mood-dropbtn::before {
+    transform: scaleX(1);
+}
+
+/* Dropdown Content (Hidden by Default) */
+.mood-dropdown-content {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: rgba(18, 18, 18, 0.85); /* Dark background matching Spotify card */
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    min-width: 130px;
+    border-radius: 12px;
+    padding: 6px;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.mood-dropdown:hover .mood-dropdown-content {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(5px);
+}
+
+/* Dropdown Buttons */
+.mood-dropdown-content button {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 10px 14px;
+    text-align: left;
+    width: 100%;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.mood-dropdown-content button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #1DB954; /* Spotify green highlight */
+}
