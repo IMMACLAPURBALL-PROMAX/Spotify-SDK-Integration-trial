@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Sparkles } from "@react-three/drei";
 import gsap from "gsap";
 
@@ -203,6 +203,7 @@ function LiquidBackgroundScene({
   mouseTarget,
   hoverActive,
 }: LiquidBackgroundSceneProps) {
+  const { width, height } = useThree((state) => state.viewport);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const mouseLerped = useRef(new THREE.Vector2(0.5, 0.5));
   const lastTrackUrlRef = useRef<string | null>(null);
@@ -382,8 +383,8 @@ function LiquidBackgroundScene({
 
   return (
     <>
-      <mesh>
-        <planeGeometry args={[2, 2]} />
+      <mesh scale={[width, height, 1]}>
+        <planeGeometry args={[1, 1]} />
         <shaderMaterial
           ref={materialRef}
           vertexShader={vertexShader}
