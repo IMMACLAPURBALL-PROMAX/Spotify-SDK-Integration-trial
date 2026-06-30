@@ -345,9 +345,9 @@ function BackgroundPlane({
     smoothMouse.current.lerp(mouseTarget.current, 1.0 - Math.pow(0.05, delta));
 
     // Update uniforms
-    mat.uniforms.uTexture1.value = textures.texture1 ?? PLACEHOLDER_TEX;
-    mat.uniforms.uTexture2.value = textures.texture2 ?? PLACEHOLDER_TEX;
-    mat.uniforms.uHoverTexture.value = textures.hoverTexture ?? PLACEHOLDER_TEX;
+    mat.uniforms.uTexture1.value = textures.texture1Ref.current ?? PLACEHOLDER_TEX;
+    mat.uniforms.uTexture2.value = textures.texture2Ref.current ?? PLACEHOLDER_TEX;
+    mat.uniforms.uHoverTexture.value = textures.hoverTextureRef.current ?? PLACEHOLDER_TEX;
     mat.uniforms.uProgress.value = textures.progress.value;
     mat.uniforms.uHover.value = textures.hoverAmount.value;
     mat.uniforms.uTime.value += delta;

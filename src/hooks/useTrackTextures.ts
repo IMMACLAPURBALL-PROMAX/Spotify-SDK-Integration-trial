@@ -10,11 +10,11 @@ import gsap from "gsap";
 
 export interface TrackTextures {
   /** The currently displayed track texture (or the "from" texture during transition). */
-  texture1: THREE.Texture | null;
+  texture1Ref: React.MutableRefObject<THREE.Texture | null>;
   /** The incoming track texture (the "to" texture during transition). */
-  texture2: THREE.Texture | null;
+  texture2Ref: React.MutableRefObject<THREE.Texture | null>;
   /** The hover preview texture (next track in queue). */
-  hoverTexture: THREE.Texture | null;
+  hoverTextureRef: React.MutableRefObject<THREE.Texture | null>;
   /** GSAP-animated 0→1 transition progress. */
   progress: { value: number };
   /** GSAP-animated 0→1 hover lens intensity. */
@@ -163,9 +163,9 @@ export function useTrackTextures(
   }, [hoverActive, hoverTrackUrl]);
 
   return {
-    texture1: tex1Ref.current,
-    texture2: tex2Ref.current,
-    hoverTexture: tex3Ref.current,
+    texture1Ref: tex1Ref,
+    texture2Ref: tex2Ref,
+    hoverTextureRef: tex3Ref,
     progress: progressRef.current,
     hoverAmount: hoverAmountRef.current,
     imageRes1: imgRes1Ref.current,

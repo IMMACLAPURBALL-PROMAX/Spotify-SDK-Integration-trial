@@ -261,9 +261,9 @@ function BackgroundPlane({
     mat.uniforms.uMouse.value.copy(mouseLerped.current);
 
     // Textures from shared hook
-    mat.uniforms.uTexture1.value = textures.texture1 ?? fallbackTex;
-    mat.uniforms.uTexture2.value = textures.texture2 ?? fallbackTex;
-    mat.uniforms.uHoverTexture.value = textures.hoverTexture ?? fallbackTex;
+    mat.uniforms.uTexture1.value = textures.texture1Ref.current ?? fallbackTex;
+    mat.uniforms.uTexture2.value = textures.texture2Ref.current ?? fallbackTex;
+    mat.uniforms.uHoverTexture.value = textures.hoverTextureRef.current ?? fallbackTex;
 
     // Animated values
     mat.uniforms.uProgress.value = textures.progress.value;
@@ -429,9 +429,9 @@ function EnergyPostProcessing() {
     <EffectComposer>
       {/* Heavy neon glow — picks up emissive + toneMapped={false} elements */}
       <Bloom
-        luminanceThreshold={0.15}
+        luminanceThreshold={0.85}
         luminanceSmoothing={0.1}
-        intensity={1.8}
+        intensity={1.2}
         mipmapBlur
       />
       {/* Subtle RGB edge splitting for that club-monitor feel */}

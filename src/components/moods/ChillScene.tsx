@@ -196,9 +196,9 @@ function ChillBackground({
     mouseLerped.current.lerp(mouseTarget.current, 0.06);
 
     // Push every uniform value
-    mat.uniforms.uTexture1.value     = textures.texture1 ?? fallbackTex;
-    mat.uniforms.uTexture2.value     = textures.texture2 ?? fallbackTex;
-    mat.uniforms.uHoverTexture.value = textures.hoverTexture ?? fallbackTex;
+    mat.uniforms.uTexture1.value     = textures.texture1Ref.current ?? fallbackTex;
+    mat.uniforms.uTexture2.value     = textures.texture2Ref.current ?? fallbackTex;
+    mat.uniforms.uHoverTexture.value = textures.hoverTextureRef.current ?? fallbackTex;
     mat.uniforms.uProgress.value     = textures.progress.value;
     mat.uniforms.uHover.value        = textures.hoverAmount.value;
     mat.uniforms.uMouse.value.copy(mouseLerped.current);
