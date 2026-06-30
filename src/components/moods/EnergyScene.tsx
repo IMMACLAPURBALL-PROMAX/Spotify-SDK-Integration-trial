@@ -184,6 +184,9 @@ const fragmentShader = /* glsl */ `
     // Dark club-like overlay
     baseColor.rgb *= 0.85;
 
+    // Clamp to prevent negative values from corrupting the Bloom HDR buffer
+    baseColor.rgb = clamp(baseColor.rgb, 0.0, 1.0);
+
     // ── Hover: "Glitch Tear" reveal circle with RGB channel splitting ──
     if (uHover > 0.0) {
       vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);

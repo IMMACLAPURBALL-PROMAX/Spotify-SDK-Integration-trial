@@ -61,6 +61,8 @@ export function useTrackTextures(
     const loader = new THREE.TextureLoader();
     loader.setCrossOrigin("anonymous");
 
+    let isActive = true;
+
     const loadTexture = async () => {
       try {
         const tex = await new Promise<THREE.Texture>((resolve, reject) => {
@@ -72,6 +74,11 @@ export function useTrackTextures(
 
         const w = (tex.image as HTMLImageElement)?.width || 1024;
         const h = (tex.image as HTMLImageElement)?.height || 1024;
+
+        if (!isActive) {
+          tex.dispose();
+          return;
+        }
 
         if (!tex1Ref.current) {
           // First texture ever loaded — set directly, no transition
@@ -118,6 +125,10 @@ export function useTrackTextures(
     };
 
     loadTexture();
+
+    return () => {
+      isActive = false;
+    };
   }, [currentTrackUrl]);
 
   // ── Load the hover preview texture ──

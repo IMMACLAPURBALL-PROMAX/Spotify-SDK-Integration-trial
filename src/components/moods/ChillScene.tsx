@@ -235,7 +235,7 @@ function BokehParticles() {
     <Float speed={0.5} rotationIntensity={0.2} floatIntensity={0.3}>
       <Sparkles
         count={80}
-        scale={[width * 0.8, height * 0.8, 2]}
+        scale={[10, 10, 2]}
         size={2.5}
         speed={0.3}
         color="#ffcc88"
