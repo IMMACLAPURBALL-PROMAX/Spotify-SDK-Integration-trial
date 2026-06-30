@@ -14,7 +14,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="stylesheet" href="https://unpkg.com/sheryjs/dist/Shery.css" />
       </head>
       <body>{children}</body>
     </html>

@@ -300,7 +300,11 @@ function Constellation() {
 
 // ─── Background Plane sub-component ──────────────────────────────────────────
 
-const PLACEHOLDER_TEX = new THREE.Texture();
+const PLACEHOLDER_TEX = (() => {
+  const t = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1, THREE.RGBAFormat);
+  t.needsUpdate = true;
+  return t;
+})();
 
 function BackgroundPlane({
   textures,
@@ -309,7 +313,8 @@ function BackgroundPlane({
 }: FocusSceneProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const matRef = useRef<THREE.ShaderMaterial>(null);
-  const { size } = useThree();
+  const { width, height } = useThree((s) => s.viewport);
+  const size = useThree((s) => s.size);
 
   // Local smoothed mouse
   const smoothMouse = useRef(new THREE.Vector2(0.5, 0.5));
@@ -354,9 +359,9 @@ function BackgroundPlane({
   });
 
   return (
-    <mesh ref={meshRef} frustumCulled={false}>
+    <mesh ref={meshRef} frustumCulled={false} scale={[width, height, 1]}>
       {/* Full-viewport quad — covers NDC -1..1 */}
-      <planeGeometry args={[2, 2]} />
+      <planeGeometry args={[1, 1]} />
       <shaderMaterial
         ref={matRef}
         vertexShader={backgroundVertexShader}

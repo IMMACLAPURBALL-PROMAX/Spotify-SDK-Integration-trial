@@ -210,7 +210,7 @@ function ChillBackground({
   });
 
   return (
-    <mesh position={[0, 0, -1]}>
+    <mesh position={[0, 0, 0]}>
       <planeGeometry args={[width, height]} />
       <shaderMaterial
         ref={matRef}

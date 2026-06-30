@@ -35,6 +35,12 @@ const NEON_COLORS = [
   new THREE.Color("#39ff14"), // acid green
 ];
 
+const fallbackTex = (() => {
+  const t = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1, THREE.RGBAFormat);
+  t.needsUpdate = true;
+  return t;
+})();
+
 // ──────────────────────────────────────────
 //  GLSL — Background Plane Shader
 // ──────────────────────────────────────────
@@ -218,15 +224,16 @@ function BackgroundPlane({
   mouseTarget,
   hoverActive,
 }: EnergySceneProps) {
-  const { viewport } = useThree();
+  const { width, height } = useThree((s) => s.viewport);
+  const size = useThree((s) => s.size);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const mouseLerped = useRef(new THREE.Vector2(0.5, 0.5));
 
   const uniforms = useMemo(
     () => ({
-      uTexture1: { value: null as THREE.Texture | null },
-      uTexture2: { value: null as THREE.Texture | null },
-      uHoverTexture: { value: null as THREE.Texture | null },
+      uTexture1: { value: fallbackTex },
+      uTexture2: { value: fallbackTex },
+      uHoverTexture: { value: fallbackTex },
       uProgress: { value: 0 },
       uHover: { value: 0 },
       uMouse: { value: new THREE.Vector2(0.5, 0.5) },
@@ -247,16 +254,16 @@ function BackgroundPlane({
     mat.uniforms.uTime.value = state.clock.getElapsedTime();
 
     // Resolution
-    mat.uniforms.uResolution.value.set(state.size.width, state.size.height);
+    mat.uniforms.uResolution.value.set(size.width, size.height);
 
     // Smooth mouse lerp
     mouseLerped.current.lerp(mouseTarget.current, 0.08);
     mat.uniforms.uMouse.value.copy(mouseLerped.current);
 
     // Textures from shared hook
-    mat.uniforms.uTexture1.value = textures.texture1;
-    mat.uniforms.uTexture2.value = textures.texture2;
-    mat.uniforms.uHoverTexture.value = textures.hoverTexture;
+    mat.uniforms.uTexture1.value = textures.texture1 ?? fallbackTex;
+    mat.uniforms.uTexture2.value = textures.texture2 ?? fallbackTex;
+    mat.uniforms.uHoverTexture.value = textures.hoverTexture ?? fallbackTex;
 
     // Animated values
     mat.uniforms.uProgress.value = textures.progress.value;
@@ -269,7 +276,7 @@ function BackgroundPlane({
   });
 
   return (
-    <mesh scale={[viewport.width, viewport.height, 1]} position={[0, 0, 0]}>
+    <mesh scale={[width, height, 1]} position={[0, 0, 0]}>
       <planeGeometry args={[1, 1]} />
       <shaderMaterial
         ref={materialRef}

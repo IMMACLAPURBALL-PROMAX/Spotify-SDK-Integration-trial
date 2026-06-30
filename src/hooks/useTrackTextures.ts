@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import gsap from "gsap";
 
@@ -39,6 +39,7 @@ export function useTrackTextures(
 ): TrackTextures {
   const lastTrackUrlRef = useRef<string | null>(null);
   const isTransitioningRef = useRef(false);
+  const [, setTrigger] = useState(0);
 
   // Stable refs that persist across renders
   const tex1Ref = useRef<THREE.Texture | null>(null);
@@ -78,6 +79,7 @@ export function useTrackTextures(
           imgRes1Ref.current.set(w, h);
           progressRef.current.value = 0.0;
           lastTrackUrlRef.current = currentTrackUrl;
+          setTrigger(p => p + 1);
         } else {
           // Subsequent texture — run GSAP crossfade
           if (isTransitioningRef.current) {
@@ -88,6 +90,7 @@ export function useTrackTextures(
           const oldTex = tex1Ref.current;
           tex2Ref.current = tex;
           imgRes2Ref.current.set(w, h);
+          setTrigger(p => p + 1);
 
           gsap.fromTo(
             progressRef.current,
@@ -104,6 +107,7 @@ export function useTrackTextures(
                 progressRef.current.value = 0.0;
                 isTransitioningRef.current = false;
                 lastTrackUrlRef.current = currentTrackUrl;
+                setTrigger(p => p + 1);
               },
             }
           );
@@ -142,6 +146,7 @@ export function useTrackTextures(
           (tex.image as HTMLImageElement)?.width || 1024,
           (tex.image as HTMLImageElement)?.height || 1024
         );
+        setTrigger(p => p + 1);
       },
       undefined,
       (err) => console.error("useTrackTextures: Error loading hover texture:", err)
