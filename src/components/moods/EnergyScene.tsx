@@ -37,6 +37,9 @@ const NEON_COLORS = [
 
 const fallbackTex = (() => {
   const t = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1, THREE.RGBAFormat);
+  t.minFilter = THREE.NearestFilter;
+  t.magFilter = THREE.NearestFilter;
+  t.generateMipmaps = false;
   t.needsUpdate = true;
   return t;
 })();

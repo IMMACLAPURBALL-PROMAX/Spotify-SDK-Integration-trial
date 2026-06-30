@@ -146,6 +146,9 @@ const fallbackTex = (() => {
     1,
     THREE.RGBAFormat
   );
+  t.minFilter = THREE.NearestFilter;
+  t.magFilter = THREE.NearestFilter;
+  t.generateMipmaps = false;
   t.needsUpdate = true;
   return t;
 })();
