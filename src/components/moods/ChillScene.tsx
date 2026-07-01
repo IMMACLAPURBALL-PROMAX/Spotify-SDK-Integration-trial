@@ -3,14 +3,6 @@
 import React, { useRef, useMemo } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Sparkles, Float } from "@react-three/drei";
-import {
-  EffectComposer,
-  DepthOfField,
-  Noise,
-  Vignette,
-} from "@react-three/postprocessing";
-import { BlendFunction } from "postprocessing";
 import type { TrackTextures } from "@/hooks/useTrackTextures";
 
 // ──────────────────────────────────────────
@@ -22,6 +14,24 @@ interface ChillSceneProps {
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   hoverActive: boolean;
 }
+
+// ──────────────────────────────────────────
+//  Fallback 1×1 transparent texture
+// ──────────────────────────────────────────
+
+const fallbackTex = (() => {
+  const t = new THREE.DataTexture(
+    new Uint8Array([0, 0, 0, 0]),
+    1,
+    1,
+    THREE.RGBAFormat
+  );
+  t.minFilter = THREE.NearestFilter;
+  t.magFilter = THREE.NearestFilter;
+  t.generateMipmaps = false;
+  t.needsUpdate = true;
+  return t;
+})();
 
 // ──────────────────────────────────────────
 //  GLSL – Vertex Shader
@@ -36,7 +46,7 @@ const vertexShader = /* glsl */ `
 `;
 
 // ──────────────────────────────────────────
-//  GLSL – Fragment Shader
+//  GLSL – Fragment Shader (Still Water)
 // ──────────────────────────────────────────
 
 const fragmentShader = /* glsl */ `
@@ -61,6 +71,9 @@ const fragmentShader = /* glsl */ `
   uniform vec2      uImageRes1;
   uniform vec2      uImageRes2;
 
+  // Mouse velocity magnitude (for wake effect)
+  uniform float     uMouseSpeed;
+
   // ── Cover-fit UV helper ──
   vec2 coverUv(vec2 uv, vec2 imgRes, vec2 screenRes) {
     float screenAspect = screenRes.x / screenRes.y;
@@ -74,15 +87,109 @@ const fragmentShader = /* glsl */ `
     return (uv - 0.5) * scale + 0.5;
   }
 
-  void main() {
-    // ── 1. Breathing UV effect ──
-    // Slow sinusoidal scale pulse (~6 s period, 0.005 amplitude)
-    float breathe = 1.0 + sin(uTime * 1.0472) * 0.005; // 2π / 6 ≈ 1.0472
-    vec2 breathedUv = (vUv - 0.5) * breathe + 0.5;
+  // ── Pseudo-random hash ──
+  float hash(float n) {
+    return fract(sin(n) * 43758.5453123);
+  }
 
-    // ── 2. Sample both track textures with cover-fit UVs ──
-    vec2 uv1 = coverUv(breathedUv, uImageRes1, uResolution);
-    vec2 uv2 = coverUv(breathedUv, uImageRes2, uResolution);
+  // ── Single ripple contribution ──
+  // Returns UV displacement caused by one ripple
+  vec2 ripple(vec2 uv, vec2 origin, float age, float amplitude) {
+    vec2 delta = uv - origin;
+    // Aspect-correct the distance
+    float aspect = uResolution.x / uResolution.y;
+    delta.x *= aspect;
+    float dist = length(delta);
+
+    // Ripple ring: travels outward at a fixed speed
+    float rippleSpeed = 0.3;
+    float frequency = 12.0;
+    float ringPos = age * rippleSpeed;
+
+    // Only distort near the ring front (gaussian envelope around the ring)
+    float ringWidth = 0.06;
+    float envelope = exp(-pow(dist - ringPos, 2.0) / (2.0 * ringWidth * ringWidth));
+
+    // Fade out over lifetime
+    float lifeFade = exp(-age * 0.8);
+
+    // Fade out with distance
+    float distFade = 1.0 / (1.0 + dist * 3.0);
+
+    // The actual wave
+    float wave = sin(dist * frequency - age * 8.0) * amplitude * envelope * lifeFade * distFade;
+
+    // Displacement direction: radially outward from origin
+    vec2 dir = dist > 0.001 ? normalize(delta) : vec2(0.0);
+    // Un-correct the aspect for the output displacement
+    dir.x /= aspect;
+
+    return dir * wave;
+  }
+
+  void main() {
+    vec2 uv = vUv;
+
+    // ── 1. Autonomous ripple system ──
+    // 5 ripple slots, each with a staggered cycle
+    vec2 totalDisplacement = vec2(0.0);
+
+    for (int i = 0; i < 5; i++) {
+      float fi = float(i);
+      // Each ripple has a different period (3.5-6s) and phase offset
+      float period = 3.5 + hash(fi * 7.0) * 2.5;
+      float phase = hash(fi * 13.0 + 3.7) * period;
+      float age = mod(uTime + phase, period);
+
+      // Pseudo-random origin for this cycle
+      float cycle = floor((uTime + phase) / period);
+      float ox = hash(fi * 17.0 + cycle * 31.0) * 0.6 + 0.2; // keep within 0.2-0.8
+      float oy = hash(fi * 23.0 + cycle * 37.0) * 0.6 + 0.2;
+      vec2 origin = vec2(ox, oy);
+
+      // Amplitude varies per ripple
+      float amp = 0.008 + hash(fi * 41.0 + cycle * 53.0) * 0.006;
+
+      totalDisplacement += ripple(uv, origin, age, amp);
+    }
+
+    // ── 2. Mouse wake effect ──
+    // Subtle ripple emanating from mouse position, intensity based on mouse speed
+    float mouseRippleAmp = uMouseSpeed * 0.015;
+    if (mouseRippleAmp > 0.001) {
+      vec2 mouseDelta = uv - uMouse;
+      float aspect = uResolution.x / uResolution.y;
+      mouseDelta.x *= aspect;
+      float mouseDist = length(mouseDelta);
+
+      // Concentric rings around cursor
+      float mouseWave = sin(mouseDist * 25.0 - uTime * 6.0) * mouseRippleAmp;
+      float mouseEnv = exp(-mouseDist * 5.0); // tight around cursor
+      vec2 mouseDir = mouseDist > 0.001 ? normalize(mouseDelta) : vec2(0.0);
+      mouseDir.x /= aspect;
+
+      totalDisplacement += mouseDir * mouseWave * mouseEnv;
+    }
+
+    // ── 3. Track transition: sweeping distortion wave ──
+    if (uProgress > 0.0 && uProgress < 1.0) {
+      // A vertical wave sweeps from left to right as progress goes 0→1
+      float waveFront = uProgress;
+      float waveWidth = 0.12;
+      float transitionDist = abs(uv.x - waveFront);
+      float transitionEnv = exp(-transitionDist * transitionDist / (2.0 * waveWidth * waveWidth));
+
+      // Strong vertical distortion at the wave front
+      float transitionWave = sin(uv.y * 20.0 - uTime * 10.0) * 0.025 * transitionEnv;
+      totalDisplacement.x += transitionWave;
+      totalDisplacement.y += sin(uv.x * 15.0 + uTime * 8.0) * 0.015 * transitionEnv;
+    }
+
+    // ── 4. Apply displacement and sample textures ──
+    vec2 distortedUv = uv + totalDisplacement;
+
+    vec2 uv1 = coverUv(distortedUv, uImageRes1, uResolution);
+    vec2 uv2 = coverUv(distortedUv, uImageRes2, uResolution);
 
     vec4 col1 = texture2D(uTexture1, uv1);
     vec4 col2 = texture2D(uTexture2, uv2);
@@ -90,43 +197,43 @@ const fragmentShader = /* glsl */ `
     // Crossfade
     vec4 color = mix(col1, col2, uProgress);
 
-    // ── 3. Warm sepia / amber color shift (25 % blend) ──
+    // ── 5. Warm amber color grade ──
     vec3 warm = vec3(
-      color.r * 1.08,   // push red up
-      color.g * 1.02,   // keep green nearly the same
-      color.b * 0.88    // pull blue down
+      color.r * 1.06,
+      color.g * 1.02,
+      color.b * 0.88
     );
-    color.rgb = mix(color.rgb, warm, 0.25);
+    color.rgb = mix(color.rgb, warm, 0.3);
 
-    // ── 4. Vignette darkening (~30 % at edges) ──
-    float dist = length(vUv - 0.5) * 1.414; // 0 at center, ~1 at corners
-    float vig  = smoothstep(0.4, 1.4, dist);
-    color.rgb *= 1.0 - vig * 0.30;
+    // Slight contrast boost
+    color.rgb = (color.rgb - 0.5) * 1.08 + 0.5;
+    color.rgb = clamp(color.rgb, 0.0, 1.0);
 
-    // ── 5. Hover preview — soft dreamy portal ──
+    // ── 6. Vignette ──
+    float dist = length(vUv - 0.5) * 1.414;
+    float vig = smoothstep(0.3, 1.3, dist);
+    color.rgb *= 1.0 - vig * 0.4;
+
+    // ── 7. Hover preview — soft dreamy portal ──
     if (uHover > 0.001) {
-      // Mouse is in 0-1 normalized coords; compute distance in aspect-corrected space
-      vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-      float d = length((vUv - uMouse) * aspect);
+      vec2 aspect2 = vec2(uResolution.x / uResolution.y, 1.0);
+      float d = length((vUv - uMouse) * aspect2);
 
-      // Circular reveal: 0.15 radius, 0.08 feather
+      // Circular reveal with soft feathered edge
       float circle = 1.0 - smoothstep(0.07, 0.15, d);
-      circle *= uHover; // fade in / out with hover amount
+      circle *= uHover;
 
-      // Sample hover texture with a subtle UV wobble for dreamy softness
-      vec2 hoverUvBase = coverUv(breathedUv, uImageRes3, uResolution);
-      float wobble = sin(uTime * 2.0 + vUv.x * 30.0) * 0.002
-                   + cos(uTime * 1.7 + vUv.y * 30.0) * 0.002;
-      vec2 hoverUv = hoverUvBase + wobble;
-      vec4 hoverCol = texture2D(uHoverTexture, hoverUv);
+      // Sample hover texture with the same water distortion applied
+      vec2 hoverUvBase = coverUv(distortedUv, uImageRes3, uResolution);
+      vec4 hoverCol = texture2D(uHoverTexture, hoverUvBase);
 
-      // Apply same warm tint to hover texture for consistency
+      // Apply same warm tint
       vec3 hoverWarm = vec3(
-        hoverCol.r * 1.08,
+        hoverCol.r * 1.06,
         hoverCol.g * 1.02,
         hoverCol.b * 0.88
       );
-      hoverCol.rgb = mix(hoverCol.rgb, hoverWarm, 0.25);
+      hoverCol.rgb = mix(hoverCol.rgb, hoverWarm, 0.3);
 
       color.rgb = mix(color.rgb, hoverCol.rgb, circle);
     }
@@ -136,28 +243,10 @@ const fragmentShader = /* glsl */ `
 `;
 
 // ──────────────────────────────────────────
-//  Fallback 1×1 transparent texture
+//  Still Water Background (single plane)
 // ──────────────────────────────────────────
 
-const fallbackTex = (() => {
-  const t = new THREE.DataTexture(
-    new Uint8Array([0, 0, 0, 0]),
-    1,
-    1,
-    THREE.RGBAFormat
-  );
-  t.minFilter = THREE.NearestFilter;
-  t.magFilter = THREE.NearestFilter;
-  t.generateMipmaps = false;
-  t.needsUpdate = true;
-  return t;
-})();
-
-// ──────────────────────────────────────────
-//  Background Plane (album art + hover)
-// ──────────────────────────────────────────
-
-function ChillBackground({
+function StillWaterBackground({
   textures,
   mouseTarget,
 }: {
@@ -165,14 +254,14 @@ function ChillBackground({
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
 }) {
   const { width, height } = useThree((s) => s.viewport);
-  const { size } = useThree();
-
+  const size = useThree((s) => s.size);
   const matRef = useRef<THREE.ShaderMaterial>(null);
 
-  // Smoothly interpolated mouse position (0-1 range)
+  // Smoothly interpolated mouse position
   const mouseLerped = useRef(new THREE.Vector2(0.5, 0.5));
+  const lastMouse = useRef(new THREE.Vector2(0.5, 0.5));
+  const mouseSpeedRef = useRef(0);
 
-  // Build uniforms once; update values each frame
   const uniforms = useMemo(
     () => ({
       uTexture1:     { value: fallbackTex },
@@ -181,6 +270,7 @@ function ChillBackground({
       uProgress:     { value: 0 },
       uHover:        { value: 0 },
       uMouse:        { value: new THREE.Vector2(0.5, 0.5) },
+      uMouseSpeed:   { value: 0 },
       uTime:         { value: 0 },
       uResolution:   { value: new THREE.Vector2(size.width, size.height) },
       uImageRes1:    { value: new THREE.Vector2(1, 1) },
@@ -191,20 +281,29 @@ function ChillBackground({
     []
   );
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     const mat = matRef.current;
     if (!mat) return;
 
-    // Lerp mouse toward target for smooth tracking
+    // Lerp mouse
     mouseLerped.current.lerp(mouseTarget.current, 0.06);
 
-    // Push every uniform value
+    // Calculate mouse speed (distance moved per frame)
+    const dx = mouseLerped.current.x - lastMouse.current.x;
+    const dy = mouseLerped.current.y - lastMouse.current.y;
+    const rawSpeed = Math.sqrt(dx * dx + dy * dy) / Math.max(delta, 0.001);
+    // Smooth the speed value
+    mouseSpeedRef.current += (rawSpeed - mouseSpeedRef.current) * 0.1;
+    lastMouse.current.copy(mouseLerped.current);
+
+    // Push uniforms
     mat.uniforms.uTexture1.value     = textures.texture1Ref.current ?? fallbackTex;
     mat.uniforms.uTexture2.value     = textures.texture2Ref.current ?? fallbackTex;
     mat.uniforms.uHoverTexture.value = textures.hoverTextureRef.current ?? fallbackTex;
     mat.uniforms.uProgress.value     = textures.progress.value;
     mat.uniforms.uHover.value        = textures.hoverAmount.value;
     mat.uniforms.uMouse.value.copy(mouseLerped.current);
+    mat.uniforms.uMouseSpeed.value   = Math.min(mouseSpeedRef.current, 1.0);
     mat.uniforms.uTime.value         = clock.getElapsedTime();
     mat.uniforms.uResolution.value.set(size.width, size.height);
     mat.uniforms.uImageRes1.value.copy(textures.imageRes1);
@@ -228,50 +327,6 @@ function ChillBackground({
 }
 
 // ──────────────────────────────────────────
-//  Bokeh Particles (ambient floating lights)
-// ──────────────────────────────────────────
-
-function BokehParticles() {
-  const { width, height } = useThree((s) => s.viewport);
-
-  return (
-    <Float speed={0.5} rotationIntensity={0.2} floatIntensity={0.3}>
-      <Sparkles
-        count={80}
-        scale={[10, 10, 2]}
-        size={2.5}
-        speed={0.3}
-        color="#ffcc88"
-        opacity={0.5}
-        noise={1.5}
-      />
-    </Float>
-  );
-}
-
-// ──────────────────────────────────────────
-//  Post-Processing Stack
-// ──────────────────────────────────────────
-
-function ChillPostProcessing() {
-  return (
-    <EffectComposer multisampling={0}>
-      <DepthOfField
-        focusDistance={0.01}
-        focalLength={0.02}
-        bokehScale={6}
-      />
-      <Noise
-        premultiply
-        blendFunction={BlendFunction.SOFT_LIGHT}
-        opacity={0.06}
-      />
-      <Vignette offset={0.3} darkness={0.65} />
-    </EffectComposer>
-  );
-}
-
-// ──────────────────────────────────────────
 //  Main Scene Export
 // ──────────────────────────────────────────
 
@@ -282,14 +337,8 @@ export function ChillScene({
 }: ChillSceneProps) {
   return (
     <>
-      {/* Layer 1 — Album art background with crossfade & hover portal */}
-      <ChillBackground textures={textures} mouseTarget={mouseTarget} />
-
-      {/* Layer 2 — Ambient bokeh particles */}
-      <BokehParticles />
-
-      {/* Layer 3 — Post-processing (DoF, grain, vignette) */}
-      <ChillPostProcessing />
+      {/* Single plane — all ripple/water effects happen inside the shader */}
+      <StillWaterBackground textures={textures} mouseTarget={mouseTarget} />
     </>
   );
 }
