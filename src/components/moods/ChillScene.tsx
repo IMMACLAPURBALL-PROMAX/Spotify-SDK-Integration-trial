@@ -268,7 +268,7 @@ function SilkPlane({ textures, layerType, mouseTarget, zOffset }: SilkPlaneProps
   });
 
   // Determine blending mode per layer
-  let blending = THREE.NormalBlending;
+  let blending: THREE.Blending = THREE.NormalBlending;
   if (layerType === 1) blending = THREE.CustomBlending; // Screen blend
   if (layerType === 2) blending = THREE.AdditiveBlending;
 
