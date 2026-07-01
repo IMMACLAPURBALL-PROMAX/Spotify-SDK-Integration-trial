@@ -18,6 +18,7 @@ interface LiquidBackgroundSceneProps {
   mood: "chill" | "energy" | "focus";
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   hoverActive: boolean;
+  playbackState: any;
 }
 
 function LiquidBackgroundScene({
@@ -26,6 +27,7 @@ function LiquidBackgroundScene({
   mood,
   mouseTarget,
   hoverActive,
+  playbackState,
 }: LiquidBackgroundSceneProps) {
   // Centralized texture loading and GSAP transition state
   const textures = useTrackTextures(currentTrackUrl, hoverTrackUrl, hoverActive);
@@ -36,7 +38,7 @@ function LiquidBackgroundScene({
         <ChillScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} />
       )}
       {mood === "energy" && (
-        <EnergyScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} />
+        <EnergyScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} playbackState={playbackState} />
       )}
       {mood === "focus" && (
         <FocusScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} />
@@ -53,12 +55,14 @@ interface LiquidBackgroundProps {
   currentTrackUrl: string;
   hoverTrackUrl: string | null;
   mood: "chill" | "energy" | "focus";
+  playbackState?: any;
 }
 
 export function LiquidBackground({
   currentTrackUrl,
   hoverTrackUrl,
   mood,
+  playbackState,
 }: LiquidBackgroundProps) {
   const mouseTarget = useRef(new THREE.Vector2(0.5, 0.5));
   const [hoverActive, setHoverActive] = useState(false);
@@ -106,6 +110,7 @@ export function LiquidBackground({
           mood={mood}
           mouseTarget={mouseTarget}
           hoverActive={hoverActive}
+          playbackState={playbackState}
         />
       </Canvas>
     </div>

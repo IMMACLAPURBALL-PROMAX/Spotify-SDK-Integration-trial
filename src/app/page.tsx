@@ -291,6 +291,13 @@ export default function Home() {
     ? playerState.nextTrackArtUrl
     : STATIC_IMAGES[(currentSlideIndex + 1) % 5];
 
+  const playbackState = isSpotifyActive && playerState.currentTrack ? {
+    positionMs: currentPosMs,
+    isPaused: playerState.isPaused,
+    volume: playerState.volume,
+    durationMs: playerState.currentTrack.durationMs,
+  } : null;
+
   return (
     <>
       <div id="main" onClick={handleMainClick}>
@@ -298,6 +305,7 @@ export default function Home() {
           currentTrackUrl={currentBgUrl}
           hoverTrackUrl={nextBgUrl}
           mood={mood}
+          playbackState={playbackState}
         />
 
         <div id="top">
