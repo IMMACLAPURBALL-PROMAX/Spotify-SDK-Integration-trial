@@ -229,12 +229,15 @@ export default function Home() {
   useEffect(() => {
     if (isSpotifyActive) return;
 
+    // Disabled auto-changing backgrounds for easier testing
+    /*
     const interval = setInterval(() => {
       if (animatingRef.current) return;
       runGsapTransition(null, null);
     }, 5000);
 
     return () => clearInterval(interval);
+    */
   }, [isSpotifyActive]);
 
   // ── Playback slider seek event handlers ──
