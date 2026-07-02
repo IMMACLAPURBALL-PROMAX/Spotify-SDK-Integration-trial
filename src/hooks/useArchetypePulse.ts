@@ -12,6 +12,8 @@ export function useArchetypePulse() {
   const stateRef = useRef({
     localTimeSec: 0,
     pulseValue: 0,
+    speedMulti: 1.0,
+    chromaticMulti: 1.0,
   });
 
   const update = (delta: number, playbackState: PlaybackState | null) => {
@@ -55,8 +57,15 @@ export function useArchetypePulse() {
 
       // Combine math - Only use the heavy kick for the main background pulse to avoid a strobe effect
       s.pulseValue = kickPulse * currentIntensity * playbackState.volume;
+      
+      s.speedMulti = 1.0 + hihatPulse * 15.0; // Spikes well over 2.5 on hi-hat hits to trigger jitter
+      s.chromaticMulti = 1.0 + (currentIntensity * 3.0); // Wider RGB separation during drops
     }
-    return s.pulseValue;
+    return {
+      pulseValue: s.pulseValue,
+      speedMulti: s.speedMulti,
+      chromaticMulti: s.chromaticMulti
+    };
   };
 
   return { update };

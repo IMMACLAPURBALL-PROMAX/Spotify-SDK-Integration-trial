@@ -167,8 +167,15 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState
     let chromaticMulti = 1.0;
     let speedMulti = 1.0;
       // SMART Synthesizer Engine (Archetype JSON based)
-      const pulse = updatePulse(delta, playbackState || null);
-      activePulse = (1.0 - transitionPeak) * pulse;
+      const pulseData = updatePulse(delta, playbackState || null);
+      if (typeof pulseData === 'object') {
+        activePulse = (1.0 - transitionPeak) * pulseData.pulseValue;
+        speedMulti = pulseData.speedMulti;
+        chromaticMulti = pulseData.chromaticMulti;
+      } else {
+        // Fallback for old hook
+        activePulse = (1.0 - transitionPeak) * (pulseData as number);
+      }
 
     if (layerType > 0) {
       // Each RGB plane floats in a slightly different orbital direction
