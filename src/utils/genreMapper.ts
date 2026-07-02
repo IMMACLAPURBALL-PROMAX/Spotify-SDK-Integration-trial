@@ -5,14 +5,14 @@ export enum ArchetypeID {
   TRAP_HIPHOP = 'archetype_a',
   POP_EDM = 'archetype_b',
   ACOUSTIC_AMBIENT = 'archetype_c',
-  DEFAULT = 'archetype_b', // Default to Pop/EDM if no match is found
 }
+
+export const DEFAULT_ARCHETYPE = ArchetypeID.POP_EDM;
 
 const GENRE_MAP: Record<ArchetypeID, string[]> = {
   [ArchetypeID.TRAP_HIPHOP]: ['rap', 'hip hop', 'trap', 'drill', 'phonk'],
   [ArchetypeID.POP_EDM]: ['pop', 'dance pop', 'house', 'edm', 'techno', 'slap house'],
   [ArchetypeID.ACOUSTIC_AMBIENT]: ['acoustic', 'singer-songwriter', 'indie', 'ambient', 'classical', 'lo-fi'],
-  [ArchetypeID.DEFAULT]: [],
 };
 
 /**
@@ -24,7 +24,7 @@ const GENRE_MAP: Record<ArchetypeID, string[]> = {
  */
 export function mapGenresToArchetype(spotifyGenres: string[]): string {
   if (!spotifyGenres || spotifyGenres.length === 0) {
-    return ArchetypeID.DEFAULT;
+    return DEFAULT_ARCHETYPE;
   }
 
   const scores = {
@@ -51,7 +51,7 @@ export function mapGenresToArchetype(spotifyGenres: string[]): string {
   }
 
   // Find the archetype with the highest score
-  let bestMatch = ArchetypeID.DEFAULT;
+  let bestMatch: string = DEFAULT_ARCHETYPE;
   let highestScore = 0;
 
   for (const [archetype, score] of Object.entries(scores)) {
