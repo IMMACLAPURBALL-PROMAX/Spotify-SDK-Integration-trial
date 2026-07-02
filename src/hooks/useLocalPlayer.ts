@@ -1,0 +1,304 @@
+"use client";
+
+import { useState, useEffect, useRef, useCallback } from "react";
+import type { SpotifyPlayerState, SpotifyPlayerControls, SpotifyTrackInfo } from "./useSpotifyPlayer";
+
+export const LOCAL_PLAYLISTS = {
+  chill: [
+    {
+      id: "local-chill-1",
+      name: "The Color Violet",
+      primaryArtist: "Tory Lanez",
+      featuredArtists: [],
+      albumName: "Alone At Prom",
+      albumArtUrl: "/images/alone-at-prom.webp",
+      audioUrl: "/audio/tory-lanez-the-color-violet.mp3",
+    },
+    {
+      id: "local-chill-2",
+      name: "LET GO",
+      primaryArtist: "Central Cee",
+      featuredArtists: [],
+      albumName: "LET GO",
+      albumArtUrl: "/images/let-go.jpg",
+      audioUrl: "/audio/central-cee-let-go.mp3",
+    },
+    {
+      id: "local-chill-3",
+      name: "MY EYES",
+      primaryArtist: "Travis Scott",
+      featuredArtists: [],
+      albumName: "UTOPIA",
+      albumArtUrl: "/images/my-eyes.webp",
+      audioUrl: "/audio/travis-scott-my-eyes.mp3",
+    },
+    {
+      id: "local-chill-4",
+      name: "ocean eyes",
+      primaryArtist: "Billie Eilish",
+      featuredArtists: [],
+      albumName: "dont smile at me",
+      albumArtUrl: "/images/cover3.jpg",
+      audioUrl: "/audio/billie-eilish-ocean-eyes.mp3",
+    },
+    {
+      id: "local-chill-5",
+      name: "CHIHIRO",
+      primaryArtist: "Billie Eilish",
+      featuredArtists: [],
+      albumName: "HIT ME HARD AND SOFT",
+      albumArtUrl: "/images/cover2.jpg",
+      audioUrl: "/audio/billie-eilish-chihiro.mp3",
+    },
+    {
+      id: "local-chill-6",
+      name: "Happier Than Ever",
+      primaryArtist: "Billie Eilish",
+      featuredArtists: [],
+      albumName: "Happier Than Ever",
+      albumArtUrl: "/images/img10.jpg",
+      audioUrl: "/audio/billie-eilish-happier-than-ever.mp3",
+    },
+    {
+      id: "local-chill-7",
+      name: "I Wanna Be Yours",
+      primaryArtist: "Arctic Monkeys",
+      featuredArtists: [],
+      albumName: "AM",
+      albumArtUrl: "/images/i-wanna-be-yours.jpg",
+      audioUrl: "/audio/arctic-monkeys-i-wanna-be-yours.mp3",
+    }
+  ],
+  energy: [
+    // Fallback tracks for Energy until you upload specific Energy tracks
+    {
+      id: "local-energy-1",
+      name: "LUNCH",
+      primaryArtist: "Billie Eilish",
+      featuredArtists: [],
+      albumName: "HIT ME HARD AND SOFT",
+      albumArtUrl: "/images/billie5.jpg",
+      audioUrl: "/audio/billie-eilish-lunch.mp3",
+    }
+  ],
+  focus: [
+    // Fallback tracks for Focus until you upload specific Focus tracks
+    {
+      id: "local-focus-1",
+      name: "bury a friend",
+      primaryArtist: "Billie Eilish",
+      featuredArtists: [],
+      albumName: "WHEN WE ALL FALL ASLEEP",
+      albumArtUrl: "/images/cover4.jpg",
+      audioUrl: "/audio/billie-eilish-bury-a-friend.mp3",
+    },
+    {
+      id: "local-focus-2",
+      name: "dont smile at me",
+      primaryArtist: "Billie Eilish",
+      featuredArtists: [],
+      albumName: "dont smile at me",
+      albumArtUrl: "/images/cover3.jpg",
+      audioUrl: "/audio/billie-eilish-dont-smile-at-me.mp3",
+    }
+  ]
+};
+
+export interface AudioReactivityData {
+  subBass: number;
+  bass: number;
+  mid: number;
+  high: number;
+}
+
+export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: boolean) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const dataArrayRef = useRef<Uint8Array | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const playlist = LOCAL_PLAYLISTS[mood];
+
+  const [state, setState] = useState<SpotifyPlayerState>({
+    currentTrack: null,
+    isPaused: true,
+    positionMs: 0,
+    deviceId: "local-device",
+    isReady: false,
+    volume: 0.5,
+    nextTrackArtUrl: null,
+  });
+
+  // Init audio element once
+  useEffect(() => {
+    if (!isEnabled) return;
+    
+    if (!audioRef.current) {
+      const audio = new Audio();
+      audio.crossOrigin = "anonymous";
+      audioRef.current = audio;
+
+      // Listeners
+      audio.addEventListener("timeupdate", () => {
+        setState(s => {
+          const currentDuration = (audio.duration && !isNaN(audio.duration) && audio.duration !== Infinity) ? audio.duration * 1000 : 180000;
+          return {
+            ...s, 
+            positionMs: audio.currentTime * 1000,
+            currentTrack: s.currentTrack ? { ...s.currentTrack, durationMs: currentDuration } : null
+          };
+        });
+      });
+      
+      audio.addEventListener("ended", () => {
+        skipToNext();
+      });
+
+      audio.addEventListener("loadedmetadata", () => {
+        setState(s => {
+          if (!s.currentTrack) return s;
+          return {
+            ...s,
+            currentTrack: { ...s.currentTrack, durationMs: audio.duration * 1000 }
+          };
+        });
+      });
+
+      audio.addEventListener("play", () => setState(s => ({ ...s, isPaused: false })));
+      audio.addEventListener("pause", () => setState(s => ({ ...s, isPaused: true })));
+    }
+
+    return () => {
+      if (audioRef.current && !isEnabled) {
+        audioRef.current.pause();
+      }
+    };
+  }, [isEnabled]);
+
+  // Load track when index or mood changes
+  useEffect(() => {
+    if (!isEnabled || !audioRef.current) return;
+    
+    const trackData = playlist[currentIndex];
+    if (!trackData) return;
+
+    const trackInfo: SpotifyTrackInfo = {
+      id: trackData.id,
+      name: trackData.name,
+      primaryArtist: trackData.primaryArtist,
+      featuredArtists: trackData.featuredArtists,
+      albumName: trackData.albumName,
+      albumArtUrl: trackData.albumArtUrl,
+      durationMs: 180000, // placeholder until loadedmetadata fires
+    };
+
+    const nextTrackData = playlist[(currentIndex + 1) % playlist.length];
+
+    setState(s => ({
+      ...s,
+      currentTrack: trackInfo,
+      nextTrackArtUrl: nextTrackData?.albumArtUrl || null,
+      isReady: true,
+    }));
+
+    if (trackData.audioUrl) {
+      const wasPlaying = !audioRef.current.paused && audioRef.current.currentTime > 0;
+      audioRef.current.src = trackData.audioUrl;
+      audioRef.current.load();
+      if (wasPlaying) {
+        audioRef.current.play().catch(console.error);
+      }
+    }
+  }, [currentIndex, mood, isEnabled]); // Re-run if mood changes to reset track
+
+  // Initialize Web Audio API on first play
+  const initWebAudio = () => {
+    if (!audioCtxRef.current && audioRef.current) {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      audioCtxRef.current = new AudioContext();
+      analyserRef.current = audioCtxRef.current.createAnalyser();
+      analyserRef.current.fftSize = 4096; // 2048 bins, ~10.7Hz per bin
+      
+      sourceNodeRef.current = audioCtxRef.current.createMediaElementSource(audioRef.current);
+      sourceNodeRef.current.connect(analyserRef.current);
+      analyserRef.current.connect(audioCtxRef.current.destination);
+
+      dataArrayRef.current = new Uint8Array(analyserRef.current.frequencyBinCount);
+    }
+    if (audioCtxRef.current?.state === "suspended") {
+      audioCtxRef.current.resume();
+    }
+  };
+
+  const togglePlay = useCallback(async () => {
+    if (!audioRef.current) return;
+    initWebAudio();
+    if (audioRef.current.paused) {
+      await audioRef.current.play().catch(console.error);
+    } else {
+      audioRef.current.pause();
+    }
+  }, []);
+
+  const skipToNext = useCallback(async () => {
+    setCurrentIndex(i => (i + 1) % playlist.length);
+  }, [playlist.length]);
+
+  const skipToPrevious = useCallback(async () => {
+    if (audioRef.current && audioRef.current.currentTime > 3) {
+      audioRef.current.currentTime = 0;
+      return;
+    }
+    setCurrentIndex(i => (i - 1 + playlist.length) % playlist.length);
+  }, [playlist.length]);
+
+  const seek = useCallback(async (positionMs: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = positionMs / 1000;
+      setState(s => ({ ...s, positionMs }));
+    }
+  }, []);
+
+  const setVolume = useCallback(async (volume: number) => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+      setState(s => ({ ...s, volume }));
+    }
+  }, []);
+
+  // Expose frequency data for 3D scenes
+  const getAudioData = useCallback((): AudioReactivityData | null => {
+    if (!analyserRef.current || !dataArrayRef.current || state.isPaused) return null;
+    
+    analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+    
+    // fftSize = 4096 -> 2048 bins -> ~10.7Hz per bin
+    let subBassSum = 0;
+    for (let i = 2; i < 6; i++) subBassSum += dataArrayRef.current[i]; // ~20Hz to 60Hz
+    
+    let bassSum = 0;
+    for (let i = 6; i < 24; i++) bassSum += dataArrayRef.current[i]; // ~60Hz to 250Hz
+    
+    let midSum = 0;
+    for (let i = 24; i < 186; i++) midSum += dataArrayRef.current[i]; // ~250Hz to 2000Hz
+    
+    let highSum = 0;
+    for (let i = 186; i < 930; i++) highSum += dataArrayRef.current[i]; // ~2000Hz to 10000Hz
+
+    // Normalize
+    return {
+      subBass: Math.min(1.0, (subBassSum / 4) / 255),
+      bass: Math.min(1.0, (bassSum / 18) / 255),
+      mid: Math.min(1.0, (midSum / 162) / 255),
+      high: Math.min(1.0, (highSum / 744) / 255),
+    };
+  }, [state.isPaused]);
+
+  return {
+    state,
+    controls: { skipToNext, skipToPrevious, togglePlay, seek, setVolume },
+    getAudioData,
+  };
+}

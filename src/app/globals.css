@@ -334,6 +334,9 @@ body, html {
     text-transform: uppercase;
     user-select: none; /* Prevents accidental blue text highlighting during animation clicks */
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 90vw;
     transition: color 0.3s ease;
 }
 

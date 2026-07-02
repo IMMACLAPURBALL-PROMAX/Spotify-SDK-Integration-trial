@@ -3,6 +3,7 @@
 import React, { useRef, useMemo } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
+import { Float, Sparkles } from "@react-three/drei";
 import type { TrackTextures } from "@/hooks/useTrackTextures";
 
 // ──────────────────────────────────────────
@@ -13,6 +14,7 @@ interface ChillSceneProps {
   textures: TrackTextures;
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   hoverActive: boolean;
+  playbackState?: any;
 }
 
 // ──────────────────────────────────────────
@@ -66,6 +68,11 @@ const fragmentShader = /* glsl */ `
   uniform float uTime;
   uniform int uLayerType;
 
+  // Audio Reactivity
+  uniform float uBass;
+  uniform float uMid;
+  uniform float uHigh;
+
   // Hover
   uniform sampler2D uHoverTexture;
   uniform float uHover;
@@ -86,8 +93,8 @@ const fragmentShader = /* glsl */ `
   }
 
   void main() {
-    // Gentle breathing UV (slow, ~8s period)
-    float breathe = 1.0 + sin(uTime * 0.785) * 0.003;
+    // Gentle breathing UV + Bass Reactivity
+    float breathe = 1.0 + sin(uTime * 0.785) * 0.003 - (uBass * 0.03); // Zoom in slightly on heavy bass hits
     vec2 uv = (vUv - 0.5) * breathe + 0.5;
 
     vec2 uv1 = coverUv(uv, uImageRes1, uResolution);
@@ -114,21 +121,17 @@ const fragmentShader = /* glsl */ `
       gl_FragColor = vec4(desat, 1.0);
 
     } else if (uLayerType == 1) {
-      // ── WARM LAYER ──
-      // Push warm amber tones, extract mid-range
-      vec3 warm = vec3(
-        color.r * 1.15,
-        color.g * 1.0,
-        color.b * 0.75
-      );
+      // ── MID LAYER ──
+      // Extract mid-range tones without applying amber tint to preserve original art
+      vec3 warm = color.rgb * (1.0 + uMid * 0.2);
 
       // Isolate mid-tones: suppress very dark and very bright areas
       float midMask = smoothstep(0.1, 0.35, lum) * (1.0 - smoothstep(0.65, 0.9, lum));
       warm *= midMask * 1.2;
 
-      // Slight grain texture
+      // Slight grain texture, reacts to High frequencies (hi-hats)
       float grain = fract(sin(dot(vUv * uTime * 0.1, vec2(12.9898, 78.233))) * 43758.5453);
-      warm += (grain - 0.5) * 0.015;
+      warm += (grain - 0.5) * (0.015 + uHigh * 0.08);
 
       gl_FragColor = vec4(clamp(warm, 0.0, 1.0), 0.6);
 
@@ -137,10 +140,6 @@ const fragmentShader = /* glsl */ `
       // Extract only the bright highlights — the ethereal glow
       float highlightMask = smoothstep(0.5, 0.85, lum);
       vec3 glow = color.rgb * highlightMask;
-
-      // Warm the glow slightly
-      glow.r *= 1.1;
-      glow.b *= 0.9;
 
       gl_FragColor = vec4(glow, highlightMask * 0.7);
     }
@@ -172,20 +171,22 @@ const fragmentShader = /* glsl */ `
 //  Silk Plane Component
 // ──────────────────────────────────────────
 
-interface SilkPlaneProps {
+interface ChillPlaneProps {
   textures: TrackTextures;
   layerType: 0 | 1 | 2;
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   zOffset: number;
+  playbackState?: any;
 }
 
-function SilkPlane({ textures, layerType, mouseTarget, zOffset }: SilkPlaneProps) {
+function ChillPlane({ textures, layerType, mouseTarget, zOffset, playbackState }: ChillPlaneProps) {
   const { width, height } = useThree((s) => s.viewport);
   const size = useThree((s) => s.size);
   const meshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const mouseLerped = useRef(new THREE.Vector2(0.5, 0.5));
   const timeRef = useRef(Math.random() * 100);
+  const subBassRef = useRef(0);
 
   const uniforms = useMemo(
     () => ({
@@ -201,20 +202,53 @@ function SilkPlane({ textures, layerType, mouseTarget, zOffset }: SilkPlaneProps
       uLayerType:    { value: layerType },
       uHover:        { value: 0 },
       uMouse:        { value: new THREE.Vector2(0.5, 0.5) },
+      uBass:         { value: 0.0 },
+      uMid:          { value: 0.0 },
+      uHigh:         { value: 0.0 },
     }),
     [layerType]
   );
 
-  useFrame((_state, delta) => {
-    const mesh = meshRef.current;
+  useFrame((state) => {
+    if (!materialRef.current) return;
     const mat = materialRef.current;
-    if (!mesh || !mat) return;
+    const mesh = meshRef.current;
+    if (!mesh) return;
 
-    timeRef.current += delta;
-    const t = timeRef.current;
+    // Update basic uniforms
+    mat.uniforms.uTime.value = state.clock.elapsedTime;
+    mat.uniforms.uResolution.value.set(state.size.width, state.size.height);
+    
+    // Smoothly interpolate uniforms for Web Audio API reactivity
+    let bass = 0.0;
+    let mid = 0.0;
+    let high = 0.0;
 
-    // Push uniforms
-    mat.uniforms.uResolution.value.set(size.width, size.height);
+    if (playbackState && (playbackState as any).getAudioData) {
+      const data = (playbackState as any).getAudioData();
+      if (data) {
+        // Isolate standard bass (musicality) - Intensity increased for testing
+        bass = Math.pow(data.bass, 1.2) * 2.0;
+
+        // Subwoofer effect: Fast attack, slow calm decay
+        const rawSub = Math.pow(data.subBass, 2.0) * 0.5; // Restored to 0.5
+        if (rawSub > subBassRef.current) {
+          subBassRef.current = THREE.MathUtils.lerp(subBassRef.current, rawSub, 0.6); // Snappy punch
+        } else {
+          subBassRef.current = THREE.MathUtils.lerp(subBassRef.current, rawSub, 0.04); // Calm, slow decay
+        }
+
+        mid = data.mid;
+        high = data.high;
+      }
+    }
+
+    // Apply the standard bass with normal smoothing, but add the raw subBassRef directly so it retains its snappy punch
+    mat.uniforms.uBass.value = THREE.MathUtils.lerp(mat.uniforms.uBass.value, bass, 0.2) + subBassRef.current;
+    mat.uniforms.uMid.value = THREE.MathUtils.lerp(mat.uniforms.uMid.value, mid, 0.1);
+    mat.uniforms.uHigh.value = THREE.MathUtils.lerp(mat.uniforms.uHigh.value, high, 0.2);
+
+    // Assign textures and crossfade
     mat.uniforms.uTexture1.value     = textures.texture1Ref.current ?? fallbackTex;
     mat.uniforms.uTexture2.value     = textures.texture2Ref.current ?? fallbackTex;
     mat.uniforms.uHoverTexture.value = textures.hoverTextureRef.current ?? fallbackTex;
@@ -222,54 +256,40 @@ function SilkPlane({ textures, layerType, mouseTarget, zOffset }: SilkPlaneProps
     mat.uniforms.uImageRes1.value.copy(textures.imageRes1);
     mat.uniforms.uImageRes2.value.copy(textures.imageRes2);
     mat.uniforms.uImageRes3.value.copy(textures.imageRes3);
-    mat.uniforms.uTime.value         = t;
     mat.uniforms.uHover.value        = textures.hoverAmount.value;
 
     mouseLerped.current.lerp(mouseTarget.current, 0.04);
     mat.uniforms.uMouse.value.copy(mouseLerped.current);
 
     // ── Silk drift animation ──
-    // Each layer sways differently — like curtains in a gentle breeze
-    // Key difference from Energy: these are SLOW, sinusoidal, overlapping waves
-    // Energy uses fast orbital motion. This uses languid pendulum swings.
-
+    const t = state.clock.elapsedTime;
     if (layerType === 0) {
-      // Deep layer: nearly still, just a tiny slow sway
       mesh.position.x = Math.sin(t * 0.15) * 0.01;
       mesh.position.y = Math.cos(t * 0.12) * 0.008;
     } else if (layerType === 1) {
-      // Warm layer: gentle diagonal drift
       mesh.position.x = Math.sin(t * 0.2 + 1.5) * 0.035;
       mesh.position.y = Math.cos(t * 0.18 + 0.7) * 0.025;
     } else {
-      // Light layer: slightly more movement, opposite phase
       mesh.position.x = Math.sin(t * 0.25 + 3.0) * 0.05;
       mesh.position.y = Math.cos(t * 0.22 + 2.1) * 0.04;
     }
 
-    // Mouse parallax — deeper layers respond less (creates depth)
     const parallaxStrength = 0.03 * (layerType + 1);
     mesh.position.x += (mouseLerped.current.x - 0.5) * -parallaxStrength;
     mesh.position.y += (mouseLerped.current.y - 0.5) * -parallaxStrength;
 
-    // Track transition: layers gently peel apart and fold back
     const transitionPeak = Math.sin(textures.progress.value * Math.PI);
     const peelDistance = transitionPeak * 0.12 * (layerType + 1);
-    // Each layer peels in a different direction
-    const peelAngle = (layerType * 2.094) + 0.5; // ~120° apart
+    const peelAngle = (layerType * 2.094) + 0.5;
     mesh.position.x += Math.cos(peelAngle) * peelDistance;
     mesh.position.y += Math.sin(peelAngle) * peelDistance;
 
-    // Very subtle rotation during peel
     mesh.rotation.z = transitionPeak * 0.03 * (layerType === 1 ? 1 : -1);
-
-    // Scale to fill viewport
-    mesh.scale.set(width * 1.05, height * 1.05, 1); // slightly oversized to hide edges during drift
+    mesh.scale.set(width * 1.05, height * 1.05, 1);
   });
 
-  // Determine blending mode per layer
   let blending: THREE.Blending = THREE.NormalBlending;
-  if (layerType === 1) blending = THREE.CustomBlending; // Screen blend
+  if (layerType === 1) blending = THREE.CustomBlending;
   if (layerType === 2) blending = THREE.AdditiveBlending;
 
   return (
@@ -283,7 +303,6 @@ function SilkPlane({ textures, layerType, mouseTarget, zOffset }: SilkPlaneProps
         transparent
         depthWrite={false}
         blending={blending}
-        // Screen blending setup for the Warm layer
         {...(layerType === 1 ? {
           blendSrc: THREE.OneFactor,
           blendDst: THREE.OneMinusSrcColorFactor,
@@ -302,22 +321,44 @@ function SilkPlane({ textures, layerType, mouseTarget, zOffset }: SilkPlaneProps
 export function ChillScene({
   textures,
   mouseTarget,
-  hoverActive: _hoverActive,
+  hoverActive,
+  playbackState
 }: ChillSceneProps) {
+  const { viewport } = useThree();
+  const sparklesRef = useRef<THREE.Group>(null);
+  
+  useFrame((state, delta) => {
+    if (sparklesRef.current) {
+      if (playbackState && (playbackState as any).getAudioData) {
+        const data = (playbackState as any).getAudioData();
+        if (data) {
+          // Use a gentle hi-hat pulse for sparkle expansion (less violent)
+          const highPulse = data.high * 0.08; 
+          sparklesRef.current.scale.setScalar(1.0 + highPulse);
+        }
+      }
+    }
+  });
+
   return (
     <>
-      {/*
-        Three Silk Layers, back to front:
-        - Deep: darkened desaturated base (Normal blend)
-        - Warm: amber mid-tones (Screen blend — brightens without washing out)
-        - Light: extracted highlights (Additive blend — ethereal glow)
-        
-        Unlike Energy's RGB shatter, these layers separate by LUMINOSITY,
-        use different blend modes, and drift gently like fabric — not orbit chaotically.
-      */}
-      <SilkPlane textures={textures} mouseTarget={mouseTarget} layerType={0} zOffset={0} />
-      <SilkPlane textures={textures} mouseTarget={mouseTarget} layerType={1} zOffset={0.01} />
-      <SilkPlane textures={textures} mouseTarget={mouseTarget} layerType={2} zOffset={0.02} />
+      <Float speed={0.5} rotationIntensity={0.2} floatIntensity={0.3}>
+        <group ref={sparklesRef} position={[0, 0, 1]}>
+          <Sparkles
+            count={80}
+            scale={[viewport.width * 0.8, viewport.height * 0.8, 2]}
+            size={2.5}
+            speed={0.3}
+            color={"#ffcc88"}
+            opacity={0.5}
+            noise={1.5}
+          />
+        </group>
+      </Float>
+
+      <ChillPlane textures={textures} layerType={0} mouseTarget={mouseTarget} zOffset={0} playbackState={playbackState} />
+      <ChillPlane textures={textures} layerType={1} mouseTarget={mouseTarget} zOffset={0.01} playbackState={playbackState} />
+      <ChillPlane textures={textures} layerType={2} mouseTarget={mouseTarget} zOffset={0.02} playbackState={playbackState} />
     </>
   );
 }

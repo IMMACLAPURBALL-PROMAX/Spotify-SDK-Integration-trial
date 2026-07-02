@@ -35,13 +35,13 @@ function LiquidBackgroundScene({
   return (
     <>
       {mood === "chill" && (
-        <ChillScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} />
+        <ChillScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} playbackState={playbackState} />
       )}
       {mood === "energy" && (
         <EnergyScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} playbackState={playbackState} />
       )}
       {mood === "focus" && (
-        <FocusScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} />
+        <FocusScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} playbackState={playbackState} />
       )}
     </>
   );

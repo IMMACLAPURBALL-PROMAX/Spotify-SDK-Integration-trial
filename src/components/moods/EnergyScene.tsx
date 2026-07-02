@@ -4,7 +4,8 @@ import React, { useRef, useMemo } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { TrackTextures } from "@/hooks/useTrackTextures";
-import { useSyntheticPulse, PlaybackState } from "@/hooks/useSyntheticPulse";
+import { PlaybackState } from "@/hooks/useSyntheticPulse";
+import { useArchetypePulse } from "@/hooks/useArchetypePulse";
 
 interface EnergySceneProps {
   textures: TrackTextures;
@@ -120,7 +121,8 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState
 
   // Physics state
   const timeRef = useRef(Math.random() * 100); // Random offset for organic float
-  const { update: updatePulse } = useSyntheticPulse(120);
+  const subBassRef = useRef(0);
+  const { update: updatePulse } = useArchetypePulse();
 
   const uniforms = useMemo(
     () => ({
@@ -153,45 +155,53 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState
     mouseLerped.current.lerp(mouseTarget.current, 0.08);
 
     // Calculate Physical Animation
-    // 1. Base Float: Organic, slow drifting
+    // 1. Base Float: Organic, drifting
     let floatX = 0;
     let floatY = 0;
+    
+    // The GSAP Transition Slam
+    const transitionPeak = Math.sin(textures.progress.value * Math.PI);
+    
+    // 3. Audio Reactivity Pulse
+    let activePulse = 0;
+    let chromaticMulti = 1.0;
+    let speedMulti = 1.0;
+      // SMART Synthesizer Engine (Archetype JSON based)
+      const pulse = updatePulse(delta, playbackState || null);
+      activePulse = (1.0 - transitionPeak) * pulse;
 
     if (layerType > 0) {
       // Each RGB plane floats in a slightly different orbital direction
-      const speed = 0.5;
-      const radius = 0.02; // Small base offset
+      const speed = 0.5 * speedMulti;
+      const radius = 0.02 * chromaticMulti; // Small base offset, expands on Mid hits
       floatX = Math.sin(t * speed + layerType * 2.0) * radius;
       floatY = Math.cos(t * speed * 1.2 + layerType * 2.0) * radius;
     }
 
-    // 2. The GSAP Transition Slam
-    const transitionPeak = Math.sin(textures.progress.value * Math.PI);
-    
-    // 3. Audio Reactivity Pulse
-    const pulse = updatePulse(delta, playbackState || null);
-    // Suppress audio pulse during the massive track transition so they don't fight
-    const activePulse = (1.0 - transitionPeak) * pulse;
-    
+    // 2. Mouse Parallax
+    const parallaxX = (mouseLerped.current.x - 0.5) * -0.05 * (layerType + 1);
+    const parallaxY = (mouseLerped.current.y - 0.5) * -0.05 * (layerType + 1);
+
     // When transitioning, multiply the float distance massively so they explode outward
     // During normal playback, the activePulse causes rhythmic micro-explosions
-    const explosionForce = 1.0 + (transitionPeak * 25.0) + (activePulse * 4.0 * layerType); 
-
-    // Add mouse parallax
-    const parallaxX = (mouseLerped.current.x - 0.5) * -0.1 * layerType;
-    const parallaxY = (mouseLerped.current.y - 0.5) * -0.1 * layerType;
+    const explosionFactor = 1.0 + (transitionPeak * 20.0) + (activePulse * 1.5);
 
     // Apply final positions
-    mesh.position.x = (floatX * explosionForce) + parallaxX;
-    mesh.position.y = (floatY * explosionForce) + parallaxY;
+    mesh.position.x = (floatX + parallaxX) * explosionFactor;
+    mesh.position.y = (floatY + parallaxY) * explosionFactor;
 
     // Add a chaotic tilt during the explosion
-    mesh.rotation.z = (Math.sin(t * 2.0 + layerType) * 0.05) * explosionForce;
+    mesh.rotation.z = (Math.sin(t * 2.0 + layerType) * 0.05) * explosionFactor;
     mesh.rotation.x = (parallaxY * 2.0) + (transitionPeak * (layerType % 2 === 0 ? 0.2 : -0.2));
     mesh.rotation.y = (parallaxX * 2.0) + (transitionPeak * (layerType === 1 ? 0.2 : -0.2));
 
+    // Add jitter on heavy hi-hat hits
+    if (speedMulti > 2.5 && layerType > 0) {
+       mesh.rotation.z += (Math.random() - 0.5) * 0.008 * (speedMulti - 1.0);
+    }
+
     // Scale up slightly during explosion to add depth
-    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType) + (activePulse * 0.05 * layerType);
+    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType) + (activePulse * 0.08 * layerType);
     mesh.scale.set(width * scalePulse, height * scalePulse, 1);
   });
 

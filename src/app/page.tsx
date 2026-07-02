@@ -8,7 +8,7 @@ import {
   clearSpotifyAuth,
 } from "@/lib/spotify-auth";
 import { LiquidBackground } from "@/components/LiquidBackground";
-import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
+import { useActivePlayer } from "@/hooks/useActivePlayer";
 import { useImageBrightness } from "@/hooks/useImageBrightness";
 
 // ── Static fallback data ──
@@ -49,8 +49,8 @@ export default function Home() {
   const [isDraggingProgress, setIsDraggingProgress] = useState(false);
   const [dragProgressMs, setDragProgressMs] = useState(0);
 
-  const { state: playerState, controls } = useSpotifyPlayer();
-  const isSpotifyActive = isLoggedIn && playerState.isReady && playerState.currentTrack !== null;
+  const { state: playerState, controls, isLocal, getAudioData } = useActivePlayer(isLoggedIn, mood);
+  const isPlayerActive = (isLoggedIn && playerState.isReady) || (!isLoggedIn && isLocal);
   const brightness = useImageBrightness(playerState.currentTrack?.albumArtUrl || STATIC_IMAGES[0]);
 
   // ── Auth check on mount ──
@@ -71,7 +71,7 @@ export default function Home() {
 
   // ── Sync background & trigger GSAP on Spotify track changes ──
   useEffect(() => {
-    if (!isSpotifyActive || !playerState.currentTrack) return;
+    if (!isPlayerActive || !playerState.currentTrack) return;
 
     const trackId = playerState.currentTrack.id;
     const artUrl = playerState.currentTrack.albumArtUrl;
@@ -79,16 +79,22 @@ export default function Home() {
     if (trackId !== lastTrackIdRef.current && artUrl) {
       if (lastTrackIdRef.current === null) {
         // First track loaded, no GSAP transition needed yet
-        // Also update the active card image manually for the first load
         const activeCard = document.querySelector(".album-card.active") as HTMLImageElement;
+        const titleEl = document.querySelector(".track-title") as HTMLElement;
+        const artistEl = document.querySelector(".artist-name") as HTMLElement;
+        const ts2 = document.querySelector(".playback-timeline .time-stamp:last-child") as HTMLElement;
+        
         if (activeCard) activeCard.src = artUrl;
+        if (titleEl) titleEl.innerText = playerState.currentTrack.name;
+        if (artistEl) artistEl.innerText = playerState.currentTrack.primaryArtist;
+        if (ts2) ts2.innerText = formatMs(playerState.currentTrack.durationMs);
       } else {
         // Track changed! Run GSAP transition visually.
         runGsapTransition(artUrl, playerState.currentTrack);
       }
       lastTrackIdRef.current = trackId;
     }
-  }, [isSpotifyActive, playerState.currentTrack]);
+  }, [isPlayerActive, playerState.currentTrack]);
 
   // ── Core GSAP Animation Logic ──
   const runGsapTransition = (newImageUrl: string | null, newTrackData: any = null) => {
@@ -107,7 +113,7 @@ export default function Home() {
       const h1s = elem.querySelectorAll("h1");
 
       // Update the incoming h1 text for Spotify mode
-      if (isSpotifyActive && newTrackData && h1s[nextIndex]) {
+      if (isPlayerActive && newTrackData && h1s[nextIndex]) {
         if (colIndex === 0) {
           // Column 1: Song Title
           h1s[nextIndex].textContent = newTrackData.name;
@@ -200,7 +206,7 @@ export default function Home() {
 
   // ── Main click handler ──
   const handleMainClick = useCallback(() => {
-    if (isSpotifyActive) {
+    if (isPlayerActive) {
       // Trigger Spotify skip. The `useEffect` above will run the GSAP transition
       // automatically when Spotify confirms the track actually changed.
       controls.skipToNext();
@@ -208,7 +214,7 @@ export default function Home() {
       // Static mode: trigger transition immediately
       runGsapTransition(null, null);
     }
-  }, [isSpotifyActive, controls]);
+  }, [isPlayerActive, controls]);
 
   // ── Premium / Login button ──
   const handlePremiumClick = (e: React.MouseEvent) => {
@@ -227,18 +233,15 @@ export default function Home() {
 
   // ── Autoplay slideshow in static mode ──
   useEffect(() => {
-    if (isSpotifyActive) return;
+    if (isPlayerActive) return;
 
-    // Disabled auto-changing backgrounds for easier testing
-    /*
     const interval = setInterval(() => {
       if (animatingRef.current) return;
       runGsapTransition(null, null);
     }, 5000);
 
     return () => clearInterval(interval);
-    */
-  }, [isSpotifyActive]);
+  }, [isPlayerActive]);
 
   // ── Playback slider seek event handlers ──
   const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -251,51 +254,52 @@ export default function Home() {
 
   const handleProgressMouseDown = () => {
     setIsDraggingProgress(true);
-    setDragProgressMs(isSpotifyActive && playerState.currentTrack ? playerState.positionMs : 0);
+    setDragProgressMs(isPlayerActive && playerState.currentTrack ? playerState.positionMs : 0);
   };
 
   const handleProgressMouseUp = () => {
     setIsDraggingProgress(false);
-    if (isSpotifyActive) {
+    if (isPlayerActive) {
       controls.seek(dragProgressMs);
     }
   };
 
   // ── Playback timeline binding calculations ──
-  const maxDurationMs = isSpotifyActive && playerState.currentTrack ? playerState.currentTrack.durationMs : 182000;
+  const maxDurationMs = isPlayerActive && playerState.currentTrack ? playerState.currentTrack.durationMs : 182000;
   const currentPosMs = isDraggingProgress 
     ? dragProgressMs 
-    : (isSpotifyActive ? playerState.positionMs : 0);
+    : (isPlayerActive ? playerState.positionMs : 0);
 
-  const displayProgressPercent = isSpotifyActive
+  const displayProgressPercent = isPlayerActive && maxDurationMs > 0
     ? `${(currentPosMs / maxDurationMs) * 100}%`
     : (STATIC_TRACK_DATA[currentSlideIndex]?.progress || "0%");
 
-  const displayTimeStart = isSpotifyActive
+  const displayTimeStart = isPlayerActive
     ? formatMs(currentPosMs)
     : (STATIC_TRACK_DATA[currentSlideIndex]?.time || "0:00");
 
-  const displayTimeEnd = isSpotifyActive && playerState.currentTrack
+  const displayTimeEnd = isPlayerActive && playerState.currentTrack
     ? formatMs(playerState.currentTrack.durationMs)
     : (STATIC_TRACK_DATA[currentSlideIndex]?.duration || "3:02");
 
-  const nowPlayingLabel = isSpotifyActive
-    ? (playerState.isPaused ? "PAUSED" : "NOW PLAYING")
+  const nowPlayingLabel = isPlayerActive
+    ? (playerState.isPaused ? "PAUSED" : (isLocal ? "LOCAL AUDIO" : "NOW PLAYING"))
     : "NOW PLAYING";
 
-  const currentBgUrl = isSpotifyActive && playerState.currentTrack?.albumArtUrl
+  const currentBgUrl = isPlayerActive && playerState.currentTrack?.albumArtUrl
     ? playerState.currentTrack.albumArtUrl
     : STATIC_IMAGES[currentSlideIndex];
 
-  const nextBgUrl = isSpotifyActive
+  const nextBgUrl = isPlayerActive
     ? playerState.nextTrackArtUrl
     : STATIC_IMAGES[(currentSlideIndex + 1) % 5];
 
-  const playbackState = isSpotifyActive && playerState.currentTrack ? {
+  const playbackState = isPlayerActive && playerState.currentTrack ? {
     positionMs: currentPosMs,
     isPaused: playerState.isPaused,
     volume: playerState.volume,
     durationMs: playerState.currentTrack.durationMs,
+    getAudioData: getAudioData || (() => null)
   } : null;
 
   return (
@@ -352,27 +356,27 @@ export default function Home() {
               <div id="heroleft">
                 {/* Column 1: Song name */}
                 <div className="elem">
-                  <h1>{isSpotifyActive ? playerState.currentTrack!.name : "No Time To Die"}</h1>
-                  <h1>CHIHIRO</h1>
-                  <h1>dont smile</h1>
-                  <h1>BURY A FRIEND</h1>
-                  <h1>Happier Than</h1>
+                  <h1>{isPlayerActive ? (playerState.currentTrack?.name || "Loading...") : "Loading..."}</h1>
+                  <h1></h1>
+                  <h1></h1>
+                  <h1></h1>
+                  <h1></h1>
                 </div>
                 {/* Column 2: Artist */}
                 <div className="elem">
-                  <h1>{isSpotifyActive ? playerState.currentTrack!.primaryArtist : "007 theme."}</h1>
-                  <h1>ocean waves.</h1>
-                  <h1>at me.</h1>
-                  <h1>sleepwalk.</h1>
-                  <h1>Ever Before.</h1>
+                  <h1>{isPlayerActive ? (playerState.currentTrack?.primaryArtist || "") : ""}</h1>
+                  <h1></h1>
+                  <h1></h1>
+                  <h1></h1>
+                  <h1></h1>
                 </div>
                 {/* Column 3: Album name */}
                 <div className="elem">
-                  <h1>{isSpotifyActive ? (playerState.currentTrack!.albumName.toLowerCase() === playerState.currentTrack!.name.toLowerCase() ? "Single" : playerState.currentTrack!.albumName) : "orchestral."}</h1>
-                  <h1>deep blue.</h1>
-                  <h1>colors.</h1>
-                  <h1>alone.</h1>
-                  <h1>heaven.</h1>
+                  <h1>{isPlayerActive && playerState.currentTrack ? (playerState.currentTrack.albumName.toLowerCase() === playerState.currentTrack.name.toLowerCase() ? "Single" : playerState.currentTrack.albumName) : ""}</h1>
+                  <h1></h1>
+                  <h1></h1>
+                  <h1></h1>
+                  <h1></h1>
                 </div>
                 <button>
                   Listen Now
@@ -426,12 +430,12 @@ export default function Home() {
                   </button>
 
                   <button className="control-btn" id="prev-track" aria-label="Previous Track"
-                    onClick={(e) => { e.stopPropagation(); if (isSpotifyActive) controls.skipToPrevious(); }}>
+                    onClick={(e) => { e.stopPropagation(); if (isPlayerActive) controls.skipToPrevious(); }}>
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
                   </button>
 
                   <button className="control-btn master-play" id="play-trigger" aria-label={playerState.isPaused ? "Play Track" : "Pause Track"}
-                    onClick={(e) => { e.stopPropagation(); if (isSpotifyActive) controls.togglePlay(); }}>
+                    onClick={(e) => { e.stopPropagation(); if (isPlayerActive) controls.togglePlay(); }}>
                     {playerState.isPaused ? (
                       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                     ) : (
@@ -440,7 +444,7 @@ export default function Home() {
                   </button>
 
                   <button className="control-btn" id="next-track" aria-label="Next Track"
-                    onClick={(e) => { e.stopPropagation(); if (isSpotifyActive) controls.skipToNext(); }}>
+                    onClick={(e) => { e.stopPropagation(); if (isPlayerActive) controls.skipToNext(); }}>
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6zm9-12h2v12h-2z" /></svg>
                   </button>
 
