@@ -11,9 +11,10 @@ export interface PlaybackState {
 export function useArchetypePulse() {
   const stateRef = useRef({
     localTimeSec: 0,
-    pulseValue: 0,
-    speedMulti: 1.0,
-    chromaticMulti: 1.0,
+    subBass: 0,
+    bass: 0,
+    mid: 0,
+    high: 0,
   });
 
   const update = (delta: number, playbackState: PlaybackState | null) => {
@@ -22,8 +23,11 @@ export function useArchetypePulse() {
       s.localTimeSec += delta;
     } else {
       if (playbackState.isPaused) {
-        s.pulseValue *= 0.85;
-        return s.pulseValue;
+        s.subBass *= 0.85;
+        s.bass *= 0.85;
+        s.mid *= 0.85;
+        s.high *= 0.85;
+        return { subBass: s.subBass, bass: s.bass, mid: s.mid, high: s.high };
       }
       const playerTimeSec = playbackState.positionMs / 1000;
       if (Math.abs(s.localTimeSec - playerTimeSec) > 0.5) {
@@ -45,7 +49,7 @@ export function useArchetypePulse() {
       // 2. High Frequency Transients (Drill Hi-Hats / Snares)
       // Rapid, erratic ticks running at exactly the transient_density speed
       const transientPhase = (s.localTimeSec / transientRateSec) % 1.0;
-      const hihatPulse = Math.pow(1.0 - transientPhase, 4.0) * 0.4;
+      const hihatPulse = Math.pow(1.0 - transientPhase, 4.0) * 0.8;
 
       // 3. Energy Section Mapping
       // Alternate between verse intensity and drop intensity every 16 bars
@@ -55,16 +59,18 @@ export function useArchetypePulse() {
         currentIntensity = archetypeData.energy_sections[1].intensity; // Drop section
       }
 
-      // Combine math - Only use the heavy kick for the main background pulse to avoid a strobe effect
-      s.pulseValue = kickPulse * currentIntensity * playbackState.volume;
-      
-      s.speedMulti = 1.0 + hihatPulse * 15.0; // Spikes well over 2.5 on hi-hat hits to trigger jitter
-      s.chromaticMulti = 1.0 + (currentIntensity * 3.0); // Wider RGB separation during drops
+      // Map to standard frequency bands
+      s.subBass = kickPulse * currentIntensity * playbackState.volume;
+      s.bass = kickPulse * 0.8 * currentIntensity * playbackState.volume;
+      s.mid = (0.2 + (currentIntensity * 0.8)) * playbackState.volume; // Steady background presence
+      s.high = hihatPulse * currentIntensity * playbackState.volume;
     }
+    
     return {
-      pulseValue: s.pulseValue,
-      speedMulti: s.speedMulti,
-      chromaticMulti: s.chromaticMulti
+      subBass: s.subBass,
+      bass: s.bass,
+      mid: s.mid,
+      high: s.high
     };
   };
 

@@ -167,14 +167,14 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState
     let chromaticMulti = 1.0;
     let speedMulti = 1.0;
       // SMART Synthesizer Engine (Archetype JSON based)
-      const pulseData = updatePulse(delta, playbackState || null);
-      if (typeof pulseData === 'object') {
-        activePulse = (1.0 - transitionPeak) * pulseData.pulseValue;
-        speedMulti = pulseData.speedMulti;
-        chromaticMulti = pulseData.chromaticMulti;
-      } else {
+      const data = updatePulse(delta, playbackState || null);
+      if (data && typeof data === 'object' && 'bass' in data) {
+        activePulse = (1.0 - transitionPeak) * data.bass;
+        speedMulti = 1.0 + (data.high * 5.0);
+        chromaticMulti = 1.0 + (data.mid * 2.0);
+      } else if (data) {
         // Fallback for old hook
-        activePulse = (1.0 - transitionPeak) * (pulseData as number);
+        activePulse = (1.0 - transitionPeak) * (data as number);
       }
 
     if (layerType > 0) {
