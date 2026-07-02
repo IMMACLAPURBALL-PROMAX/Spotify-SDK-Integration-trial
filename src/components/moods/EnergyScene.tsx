@@ -179,7 +179,8 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState
 
     if (layerType > 0) {
       // Each RGB plane floats in a slightly different orbital direction
-      const speed = 0.5 * speedMulti;
+      // Reduce speedMulti's impact here so hi-hats don't cause wild left/right glitching
+      const speed = 0.5 + (speedMulti * 0.1);
       const radius = 0.02 * chromaticMulti; // Small base offset, expands on Mid hits
       floatX = Math.sin(t * speed + layerType * 2.0) * radius;
       floatY = Math.cos(t * speed * 1.2 + layerType * 2.0) * radius;
@@ -207,8 +208,8 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState
        mesh.rotation.z += (Math.random() - 0.5) * 0.008 * (speedMulti - 1.0);
     }
 
-    // Scale up slightly during explosion to add depth
-    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType) + (activePulse * 0.08 * layerType);
+    // Scale up slightly during explosion to add depth (Increased activePulse multiplier to make it pop out more)
+    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType) + (activePulse * 0.15 * layerType);
     mesh.scale.set(width * scalePulse, height * scalePulse, 1);
   });
 
