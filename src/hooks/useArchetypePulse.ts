@@ -53,8 +53,8 @@ export function useArchetypePulse() {
         currentIntensity = archetypeData.energy_sections[1].intensity; // Drop section
       }
 
-      // Combine math
-      s.pulseValue = (kickPulse + hihatPulse) * currentIntensity * playbackState.volume;
+      // Combine math - Only use the heavy kick for the main background pulse to avoid a strobe effect
+      s.pulseValue = kickPulse * currentIntensity * playbackState.volume;
     }
     return s.pulseValue;
   };
