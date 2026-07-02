@@ -272,7 +272,7 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
   const getAudioData = useCallback((): AudioReactivityData | null => {
     if (!analyserRef.current || !dataArrayRef.current || state.isPaused) return null;
     
-    analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+    analyserRef.current.getByteFrequencyData(dataArrayRef.current as any);
     
     // fftSize = 4096 -> 2048 bins -> ~10.7Hz per bin
     let subBassSum = 0;
