@@ -4,13 +4,12 @@ import React, { useRef, useMemo } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { TrackTextures } from "@/hooks/useTrackTextures";
-import { useSyntheticPulse, PlaybackState } from "@/hooks/useSyntheticPulse";
 
 interface EnergySceneProps {
   textures: TrackTextures;
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   hoverActive: boolean;
-  playbackState?: PlaybackState | null;
+  playbackState?: any;
 }
 
 const fallbackTex = (() => {
@@ -106,10 +105,9 @@ interface KineticPlaneProps {
   layerType: 0 | 1 | 2 | 3;
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   zOffset: number;
-  playbackState?: PlaybackState | null;
 }
 
-function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState }: KineticPlaneProps) {
+function KineticPlane({ textures, layerType, mouseTarget, zOffset }: KineticPlaneProps) {
   const { width, height } = useThree((s) => s.viewport);
   const size = useThree((s) => s.size);
   const meshRef = useRef<THREE.Mesh>(null);
@@ -120,8 +118,6 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState
 
   // Physics state
   const timeRef = useRef(Math.random() * 100); // Random offset for organic float
-  const subBassRef = useRef(0);
-  const { update: updatePulse } = useSyntheticPulse(120);
 
   const uniforms = useMemo(
     () => ({
@@ -154,53 +150,41 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState
     mouseLerped.current.lerp(mouseTarget.current, 0.08);
 
     // Calculate Physical Animation
-    // 1. Base Float: Organic, drifting
+    // 1. Base Float: Organic, slow drifting
     let floatX = 0;
     let floatY = 0;
-    
-    // The GSAP Transition Slam
-    const transitionPeak = Math.sin(textures.progress.value * Math.PI);
-    
-    // 3. Audio Reactivity Pulse
-    let activePulse = 0;
-    let chromaticMulti = 1.0;
-    let speedMulti = 1.0;
-      // SYNTHETIC Pulse Engine (120BPM)
-      const pulse = updatePulse(delta, playbackState || null);
-      activePulse = (1.0 - transitionPeak) * pulse;
 
     if (layerType > 0) {
       // Each RGB plane floats in a slightly different orbital direction
-      const speed = 0.5 * speedMulti;
-      const radius = 0.02 * chromaticMulti; // Small base offset, expands on Mid hits
+      const speed = 0.5;
+      const radius = 0.02; // Small base offset
       floatX = Math.sin(t * speed + layerType * 2.0) * radius;
       floatY = Math.cos(t * speed * 1.2 + layerType * 2.0) * radius;
     }
 
-    // 2. Mouse Parallax
-    const parallaxX = (mouseLerped.current.x - 0.5) * -0.05 * (layerType + 1);
-    const parallaxY = (mouseLerped.current.y - 0.5) * -0.05 * (layerType + 1);
-
+    // 2. The GSAP Transition Slam
+    // textures.progress.value goes from 0.0 -> 1.0 (with a power2.inOut curve provided by useTrackTextures!)
+    // We use Math.sin(progress * PI) to create an arc that peaks at 1.0 in the middle of the transition!
+    const transitionPeak = Math.sin(textures.progress.value * Math.PI);
+    
     // When transitioning, multiply the float distance massively so they explode outward
-    // During normal playback, the activePulse causes rhythmic micro-explosions
-    const explosionFactor = 1.0 + (transitionPeak * 20.0) + (activePulse * 1.5);
+    const explosionForce = 1.0 + (transitionPeak * 25.0); // 25x offset distance during transition
+
+    // Add mouse parallax
+    const parallaxX = (mouseLerped.current.x - 0.5) * -0.1 * layerType;
+    const parallaxY = (mouseLerped.current.y - 0.5) * -0.1 * layerType;
 
     // Apply final positions
-    mesh.position.x = (floatX + parallaxX) * explosionFactor;
-    mesh.position.y = (floatY + parallaxY) * explosionFactor;
+    mesh.position.x = (floatX * explosionForce) + parallaxX;
+    mesh.position.y = (floatY * explosionForce) + parallaxY;
 
     // Add a chaotic tilt during the explosion
-    mesh.rotation.z = (Math.sin(t * 2.0 + layerType) * 0.05) * explosionFactor;
+    mesh.rotation.z = (Math.sin(t * 2.0 + layerType) * 0.05) * explosionForce;
     mesh.rotation.x = (parallaxY * 2.0) + (transitionPeak * (layerType % 2 === 0 ? 0.2 : -0.2));
     mesh.rotation.y = (parallaxX * 2.0) + (transitionPeak * (layerType === 1 ? 0.2 : -0.2));
 
-    // Add jitter on heavy hi-hat hits
-    if (speedMulti > 2.5 && layerType > 0) {
-       mesh.rotation.z += (Math.random() - 0.5) * 0.008 * (speedMulti - 1.0);
-    }
-
     // Scale up slightly during explosion to add depth
-    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType) + (activePulse * 0.08 * layerType);
+    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType);
     mesh.scale.set(width * scalePulse, height * scalePulse, 1);
   });
 
@@ -233,10 +217,10 @@ export function EnergyScene(props: EnergySceneProps) {
         Base is drawn normally. R, G, B are drawn with Additive Blending.
         When perfectly aligned, R+G+B perfectly reconstruct the full color image!
       */}
-      <KineticPlane {...props} layerType={0} zOffset={0} playbackState={props.playbackState} />     {/* Dark Base */}
-      <KineticPlane {...props} layerType={1} zOffset={0.01} playbackState={props.playbackState} />  {/* Red */}
-      <KineticPlane {...props} layerType={2} zOffset={0.02} playbackState={props.playbackState} />  {/* Green */}
-      <KineticPlane {...props} layerType={3} zOffset={0.03} playbackState={props.playbackState} />  {/* Blue */}
+      <KineticPlane {...props} layerType={0} zOffset={0} />     {/* Dark Base */}
+      <KineticPlane {...props} layerType={1} zOffset={0.01} />  {/* Red */}
+      <KineticPlane {...props} layerType={2} zOffset={0.02} />  {/* Green */}
+      <KineticPlane {...props} layerType={3} zOffset={0.03} />  {/* Blue */}
     </>
   );
 }
