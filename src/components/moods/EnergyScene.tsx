@@ -106,9 +106,10 @@ interface KineticPlaneProps {
   layerType: 0 | 1 | 2 | 3;
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   zOffset: number;
+  playbackState?: PlaybackState | null;
 }
 
-function KineticPlane({ textures, layerType, mouseTarget, zOffset }: KineticPlaneProps) {
+function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState }: KineticPlaneProps) {
   const { width, height } = useThree((s) => s.viewport);
   const size = useThree((s) => s.size);
   const meshRef = useRef<THREE.Mesh>(null);
@@ -225,10 +226,10 @@ export function EnergyScene(props: EnergySceneProps) {
         Base is drawn normally. R, G, B are drawn with Additive Blending.
         When perfectly aligned, R+G+B perfectly reconstruct the full color image!
       */}
-      <KineticPlane {...props} layerType={0} zOffset={0} />     {/* Dark Base */}
-      <KineticPlane {...props} layerType={1} zOffset={0.01} />  {/* Red */}
-      <KineticPlane {...props} layerType={2} zOffset={0.02} />  {/* Green */}
-      <KineticPlane {...props} layerType={3} zOffset={0.03} />  {/* Blue */}
+      <KineticPlane {...props} layerType={0} zOffset={0} playbackState={props.playbackState} />     {/* Dark Base */}
+      <KineticPlane {...props} layerType={1} zOffset={0.01} playbackState={props.playbackState} />  {/* Red */}
+      <KineticPlane {...props} layerType={2} zOffset={0.02} playbackState={props.playbackState} />  {/* Green */}
+      <KineticPlane {...props} layerType={3} zOffset={0.03} playbackState={props.playbackState} />  {/* Blue */}
     </>
   );
 }
