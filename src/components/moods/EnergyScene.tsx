@@ -4,12 +4,13 @@ import React, { useRef, useMemo } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { TrackTextures } from "@/hooks/useTrackTextures";
+import { useSyntheticPulse, PlaybackState } from "@/hooks/useSyntheticPulse";
 
 interface EnergySceneProps {
   textures: TrackTextures;
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   hoverActive: boolean;
-  playbackState?: any;
+  playbackState?: PlaybackState | null;
 }
 
 const fallbackTex = (() => {
@@ -118,6 +119,7 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset }: KineticPlan
 
   // Physics state
   const timeRef = useRef(Math.random() * 100); // Random offset for organic float
+  const { update: updatePulse } = useSyntheticPulse(120);
 
   const uniforms = useMemo(
     () => ({
@@ -167,8 +169,14 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset }: KineticPlan
     // We use Math.sin(progress * PI) to create an arc that peaks at 1.0 in the middle of the transition!
     const transitionPeak = Math.sin(textures.progress.value * Math.PI);
     
+    // 3. Audio Reactivity Pulse
+    const pulse = updatePulse(delta, playbackState || null);
+    // Suppress audio pulse during the massive track transition so they don't fight
+    const activePulse = (1.0 - transitionPeak) * pulse;
+    
     // When transitioning, multiply the float distance massively so they explode outward
-    const explosionForce = 1.0 + (transitionPeak * 25.0); // 25x offset distance during transition
+    // During normal playback, the activePulse causes rhythmic micro-explosions
+    const explosionForce = 1.0 + (transitionPeak * 25.0) + (activePulse * 4.0 * layerType);
 
     // Add mouse parallax
     const parallaxX = (mouseLerped.current.x - 0.5) * -0.1 * layerType;
@@ -184,7 +192,7 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset }: KineticPlan
     mesh.rotation.y = (parallaxX * 2.0) + (transitionPeak * (layerType === 1 ? 0.2 : -0.2));
 
     // Scale up slightly during explosion to add depth
-    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType);
+    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType) + (activePulse * 0.05 * layerType);
     mesh.scale.set(width * scalePulse, height * scalePulse, 1);
   });
 
