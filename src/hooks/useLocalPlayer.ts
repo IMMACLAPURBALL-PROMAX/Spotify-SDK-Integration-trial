@@ -109,6 +109,7 @@ export interface AudioReactivityData {
   bass: number;
   mid: number;
   high: number;
+  impact: number; // Volume transient (spikes) for hi-hats/snares
 }
 
 export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: boolean) {
@@ -116,6 +117,8 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
+  const timeDomainDataArrayRef = useRef<Uint8Array | null>(null);
+  const lastRmsRef = useRef<number>(0);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -226,6 +229,7 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
       analyserRef.current.connect(audioCtxRef.current.destination);
 
       dataArrayRef.current = new Uint8Array(analyserRef.current.frequencyBinCount);
+      timeDomainDataArrayRef.current = new Uint8Array(analyserRef.current.fftSize);
     }
     if (audioCtxRef.current?.state === "suspended") {
       audioCtxRef.current.resume();
@@ -270,9 +274,13 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
 
   // Expose frequency data for 3D scenes
   const getAudioData = useCallback((): AudioReactivityData | null => {
-    if (!analyserRef.current || !dataArrayRef.current || state.isPaused) return null;
+    if (!analyserRef.current || !dataArrayRef.current || !timeDomainDataArrayRef.current || state.isPaused) return null;
     
+    // Get Frequency Data (FFT)
     analyserRef.current.getByteFrequencyData(dataArrayRef.current as any);
+    
+    // Get Waveform Data (Time Domain)
+    analyserRef.current.getByteTimeDomainData(timeDomainDataArrayRef.current as any);
     
     // fftSize = 4096 -> 2048 bins -> ~10.7Hz per bin
     let subBassSum = 0;
@@ -287,12 +295,34 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
     let highSum = 0;
     for (let i = 186; i < 930; i++) highSum += dataArrayRef.current[i]; // ~2000Hz to 10000Hz
 
+    // Calculate RMS (Root Mean Square) for the waveform volume
+    let sumSquares = 0;
+    for (let i = 0; i < timeDomainDataArrayRef.current.length; i++) {
+      // Data is 0-255 centered at 128
+      const normalize = (timeDomainDataArrayRef.current[i] - 128) / 128;
+      sumSquares += normalize * normalize;
+    }
+    const currentRms = Math.sqrt(sumSquares / timeDomainDataArrayRef.current.length);
+    
+    // Detect transient impact (volume spike)
+    // If the current volume is significantly higher than the previous frame, we register a hit
+    let impact = 0;
+    const transientThreshold = 1.3; // Requires a 30% volume spike to trigger
+    if (currentRms > lastRmsRef.current * transientThreshold && currentRms > 0.05) {
+      // Calculate how hard the spike was (normalized 0 to 1)
+      impact = Math.min(1.0, (currentRms - (lastRmsRef.current * transientThreshold)) * 10.0);
+    }
+    
+    // Slowly decay the lastRms so it creates a rolling average
+    lastRmsRef.current = lastRmsRef.current * 0.8 + currentRms * 0.2;
+
     // Normalize
     return {
       subBass: Math.min(1.0, (subBassSum / 4) / 255),
       bass: Math.min(1.0, (bassSum / 18) / 255),
       mid: Math.min(1.0, (midSum / 162) / 255),
       high: Math.min(1.0, (highSum / 744) / 255),
+      impact: impact,
     };
   }, [state.isPaused]);
 

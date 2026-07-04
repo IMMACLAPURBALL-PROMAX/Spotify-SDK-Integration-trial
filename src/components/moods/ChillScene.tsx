@@ -333,8 +333,10 @@ export function ChillScene({
         const data = (playbackState as any).getAudioData();
         if (data) {
           // Use a gentle hi-hat pulse for sparkle expansion (less violent)
-          const highPulse = data.high * 0.08; 
-          sparklesRef.current.scale.setScalar(1.0 + highPulse);
+          // Using 'impact' which detects sharp volume spikes instead of just high frequencies,
+          // meaning vocals won't trigger the sparkles, only percussive hits.
+          const hitPulse = data.impact * 0.25; 
+          sparklesRef.current.scale.setScalar(1.0 + hitPulse);
         }
       }
     }
