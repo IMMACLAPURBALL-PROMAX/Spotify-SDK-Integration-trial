@@ -177,7 +177,8 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState
     
     // When transitioning, multiply the float distance massively so they explode outward
     // During normal playback, the activePulse causes rhythmic micro-explosions
-    const explosionForce = 1.0 + (transitionPeak * 25.0) + (activePulse * 4.0 * layerType);
+    // REDUCED INTENSITY: changed multiplier from 4.0 down to 1.2 to prevent headache-inducing massive splits
+    const explosionForce = 1.0 + (transitionPeak * 25.0) + (activePulse * 1.2 * layerType);
 
     // Add mouse parallax
     const parallaxX = (mouseLerped.current.x - 0.5) * -0.1 * layerType;
@@ -188,12 +189,14 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState
     mesh.position.y = (floatY * explosionForce) + parallaxY;
 
     // Add a chaotic tilt during the explosion
-    mesh.rotation.z = (Math.sin(t * 2.0 + layerType) * 0.05) * explosionForce;
+    // REDUCED INTENSITY: lowered base rotation from 0.05 to 0.02
+    mesh.rotation.z = (Math.sin(t * 2.0 + layerType) * 0.02) * explosionForce;
     mesh.rotation.x = (parallaxY * 2.0) + (transitionPeak * (layerType % 2 === 0 ? 0.2 : -0.2));
     mesh.rotation.y = (parallaxX * 2.0) + (transitionPeak * (layerType === 1 ? 0.2 : -0.2));
 
     // Scale up slightly during explosion to add depth
-    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType) + (activePulse * 0.05 * layerType);
+    // REDUCED INTENSITY: changed scale multiplier from 0.05 to 0.02
+    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType) + (activePulse * 0.02 * layerType);
     mesh.scale.set(width * scalePulse, height * scalePulse, 1);
   });
 
