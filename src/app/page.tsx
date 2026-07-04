@@ -8,6 +8,7 @@ import {
   clearSpotifyAuth,
 } from "@/lib/spotify-auth";
 import { LiquidBackground } from "@/components/LiquidBackground";
+import { PlayerCard } from "@/components/PlayerCard";
 import { useActivePlayer } from "@/hooks/useActivePlayer";
 import { useImageBrightness } from "@/hooks/useImageBrightness";
 
@@ -28,13 +29,6 @@ const STATIC_TRACK_DATA = [
   { title: "Happier Than Ever", artist: "Billie Eilish", duration: "4:58", time: "3:41", progress: "74%" },
 ];
 
-function formatMs(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  return `${min}:${sec.toString().padStart(2, "0")}`;
-}
-
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [mood, setMood] = useState<"chill" | "energy" | "focus">("chill");
@@ -44,10 +38,6 @@ export default function Home() {
   const lastTrackIdRef = useRef<string | null>(null);
   const masterIndexRef = useRef(0);
   const animatingRef = useRef(false);
-
-  // Playback slider dragging state
-  const [isDraggingProgress, setIsDraggingProgress] = useState(false);
-  const [dragProgressMs, setDragProgressMs] = useState(0);
 
   const { state: playerState, controls, isLocal, getAudioData } = useActivePlayer(isLoggedIn, mood);
   const isPlayerActive = (isLoggedIn && playerState.isReady) || (!isLoggedIn && isLocal);
@@ -80,14 +70,7 @@ export default function Home() {
       if (lastTrackIdRef.current === null) {
         // First track loaded, no GSAP transition needed yet
         const activeCard = document.querySelector(".album-card.active") as HTMLImageElement;
-        const titleEl = document.querySelector(".track-title") as HTMLElement;
-        const artistEl = document.querySelector(".artist-name") as HTMLElement;
-        const ts2 = document.querySelector(".playback-timeline .time-stamp:last-child") as HTMLElement;
-        
         if (activeCard) activeCard.src = artUrl;
-        if (titleEl) titleEl.innerText = playerState.currentTrack.name;
-        if (artistEl) artistEl.innerText = playerState.currentTrack.primaryArtist;
-        if (ts2) ts2.innerText = formatMs(playerState.currentTrack.durationMs);
       } else {
         // Track changed! Run GSAP transition visually.
         runGsapTransition(artUrl, playerState.currentTrack);
@@ -156,16 +139,7 @@ export default function Home() {
       incoming.src = newImageUrl;
     }
 
-    // Determine what text to show in the metadata block
     const isSpotify = !!newTrackData;
-    const title = isSpotify ? newTrackData.name : STATIC_TRACK_DATA[nextIndex].title;
-    const artist = isSpotify
-      ? (newTrackData.featuredArtists && newTrackData.featuredArtists.length > 0
-          ? `${newTrackData.primaryArtist} feat. ${newTrackData.featuredArtists.join(", ")}`
-          : newTrackData.primaryArtist)
-      : STATIC_TRACK_DATA[nextIndex].artist;
-    const timeStart = isSpotify ? "0:00" : STATIC_TRACK_DATA[nextIndex].time;
-    const timeEnd = isSpotify ? formatMs(newTrackData.durationMs) : STATIC_TRACK_DATA[nextIndex].duration;
     const progressWidth = isSpotify ? "0%" : STATIC_TRACK_DATA[nextIndex].progress;
 
     gsap.timeline()
@@ -180,14 +154,6 @@ export default function Home() {
       .to([".track-title", ".artist-name", ".time-stamp:first-child", ".time-stamp:last-child"], {
         opacity: 0, y: -5, duration: 0.15, stagger: 0.02,
         onComplete: () => {
-          const titleEl = document.querySelector(".track-title") as HTMLElement;
-          const artistEl = document.querySelector(".artist-name") as HTMLElement;
-          const ts1 = document.querySelector(".playback-timeline .time-stamp:first-child") as HTMLElement;
-          const ts2 = document.querySelector(".playback-timeline .time-stamp:last-child") as HTMLElement;
-          if (titleEl) titleEl.innerText = title;
-          if (artistEl) artistEl.innerText = artist;
-          if (ts1) ts1.innerText = timeStart;
-          if (ts2) ts2.innerText = timeEnd;
           gsap.to(".progress-slider", { backgroundSize: progressWidth, duration: 0.4, ease: "power1.out" });
         },
       }, "<")
@@ -243,48 +209,8 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [isPlayerActive]);
 
-  // ── Playback slider seek event handlers ──
-  const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseInt(e.target.value);
-    setDragProgressMs(val);
-    if (!isDraggingProgress) {
-      setIsDraggingProgress(true);
-    }
-  };
-
-  const handleProgressMouseDown = () => {
-    setIsDraggingProgress(true);
-    setDragProgressMs(isPlayerActive && playerState.currentTrack ? playerState.positionMs : 0);
-  };
-
-  const handleProgressMouseUp = () => {
-    setIsDraggingProgress(false);
-    if (isPlayerActive) {
-      controls.seek(dragProgressMs);
-    }
-  };
-
   // ── Playback timeline binding calculations ──
-  const maxDurationMs = isPlayerActive && playerState.currentTrack ? playerState.currentTrack.durationMs : 182000;
-  const currentPosMs = isDraggingProgress 
-    ? dragProgressMs 
-    : (isPlayerActive ? playerState.positionMs : 0);
-
-  const displayProgressPercent = isPlayerActive && maxDurationMs > 0
-    ? `${(currentPosMs / maxDurationMs) * 100}%`
-    : (STATIC_TRACK_DATA[currentSlideIndex]?.progress || "0%");
-
-  const displayTimeStart = isPlayerActive
-    ? formatMs(currentPosMs)
-    : (STATIC_TRACK_DATA[currentSlideIndex]?.time || "0:00");
-
-  const displayTimeEnd = isPlayerActive && playerState.currentTrack
-    ? formatMs(playerState.currentTrack.durationMs)
-    : (STATIC_TRACK_DATA[currentSlideIndex]?.duration || "3:02");
-
-  const nowPlayingLabel = isPlayerActive
-    ? (playerState.isPaused ? "PAUSED" : (isLocal ? "LOCAL AUDIO" : "NOW PLAYING"))
-    : "NOW PLAYING";
+  const currentPosMs = isPlayerActive ? playerState.positionMs : 0;
 
   const currentBgUrl = isPlayerActive && playerState.currentTrack?.albumArtUrl
     ? playerState.currentTrack.albumArtUrl
@@ -385,74 +311,15 @@ export default function Home() {
                   </svg>
                 </button>
               </div>
-
-              <div id="heroright">
-                <p>{nowPlayingLabel}</p>
-
-                {/* We render all 5 cards so GSAP can cycle through them. 
-                    In Spotify mode, GSAP dynamically swaps the src of the incoming card. */}
-                <div className="imagediv">
-                  <img src="/images/cover1.jpg" className="album-card" alt="Deck Card 1" />
-                  <img src="/images/cover2.jpg" className="album-card" alt="Deck Card 2" />
-                  <img src="/images/cover3.jpg" className="album-card" alt="Deck Card 3" />
-                  <img src="/images/cover4.jpg" className="album-card" alt="Deck Card 4" />
-                  <img src="/images/cover5.jpg" className="album-card" alt="Deck Card 5" />
-                </div>
-
-                <div className="player-meta">
-                  <h3 className="track-title">LUNCH</h3>
-                  <p className="artist-name">Billie Eilish</p>
-                </div>
-
-                <div className="playback-timeline" onClick={e => e.stopPropagation()}>
-                  <span className="time-stamp">{displayTimeStart}</span>
-                  <div className="progress-slider-container">
-                    <input 
-                      type="range"
-                      className="progress-slider"
-                      min="0"
-                      max={maxDurationMs}
-                      value={currentPosMs}
-                      style={{ backgroundSize: `${displayProgressPercent} 100%` }}
-                      onChange={handleProgressChange}
-                      onMouseDown={handleProgressMouseDown}
-                      onMouseUp={handleProgressMouseUp}
-                      onTouchStart={handleProgressMouseDown}
-                      onTouchEnd={handleProgressMouseUp}
-                    />
-                  </div>
-                  <span className="time-stamp">{displayTimeEnd}</span>
-                </div>
-
-                <div className="player-controls">
-                  <button className="control-btn secondary-btn" aria-label="Shuffle" onClick={e => e.stopPropagation()}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
-                  </button>
-
-                  <button className="control-btn" id="prev-track" aria-label="Previous Track"
-                    onClick={(e) => { e.stopPropagation(); if (isPlayerActive) controls.skipToPrevious(); }}>
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
-                  </button>
-
-                  <button className="control-btn master-play" id="play-trigger" aria-label={playerState.isPaused ? "Play Track" : "Pause Track"}
-                    onClick={(e) => { e.stopPropagation(); if (isPlayerActive) controls.togglePlay(); }}>
-                    {playerState.isPaused ? (
-                      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
-                    )}
-                  </button>
-
-                  <button className="control-btn" id="next-track" aria-label="Next Track"
-                    onClick={(e) => { e.stopPropagation(); if (isPlayerActive) controls.skipToNext(); }}>
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6zm9-12h2v12h-2z" /></svg>
-                  </button>
-
-                  <button className="control-btn secondary-btn" aria-label="Repeat" onClick={e => e.stopPropagation()}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
-                  </button>
-                </div>
-              </div>
+              <PlayerCard 
+                playerState={playerState}
+                controls={controls}
+                isPlayerActive={isPlayerActive}
+                isLocal={isLocal}
+                currentSlideIndex={currentSlideIndex}
+                staticImages={STATIC_IMAGES}
+                staticTrackData={STATIC_TRACK_DATA}
+              />
             </div>
           </div>
           {/* Leftover footer collaboration block removed */}

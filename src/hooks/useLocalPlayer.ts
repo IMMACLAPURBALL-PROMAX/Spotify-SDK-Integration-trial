@@ -119,6 +119,7 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
   const dataArrayRef = useRef<Uint8Array | null>(null);
   const timeDomainDataArrayRef = useRef<Uint8Array | null>(null);
   const lastRmsRef = useRef<number>(0);
+  const impactRef = useRef<number>(0);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -207,7 +208,8 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
     }));
 
     if (trackData.audioUrl) {
-      const wasPlaying = !audioRef.current.paused && audioRef.current.currentTime > 0;
+      // If the audio was playing OR if it just naturally finished (ended is true), we want to autoplay the next track
+      const wasPlaying = (!audioRef.current.paused && audioRef.current.currentTime > 0) || audioRef.current.ended;
       audioRef.current.src = trackData.audioUrl;
       audioRef.current.load();
       if (wasPlaying) {
@@ -306,11 +308,18 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
     
     // Detect transient impact (volume spike)
     // If the current volume is significantly higher than the previous frame, we register a hit
-    let impact = 0;
+    let currentImpact = 0;
     const transientThreshold = 1.3; // Requires a 30% volume spike to trigger
     if (currentRms > lastRmsRef.current * transientThreshold && currentRms > 0.05) {
       // Calculate how hard the spike was (normalized 0 to 1)
-      impact = Math.min(1.0, (currentRms - (lastRmsRef.current * transientThreshold)) * 10.0);
+      currentImpact = Math.min(1.0, (currentRms - (lastRmsRef.current * transientThreshold)) * 10.0);
+    }
+    
+    // Smooth the impact so it acts like a spring (bounces up instantly, decays slowly)
+    if (currentImpact > impactRef.current) {
+      impactRef.current = currentImpact; // Instant pop
+    } else {
+      impactRef.current *= 0.85; // Smooth decay
     }
     
     // Slowly decay the lastRms so it creates a rolling average
@@ -322,7 +331,7 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
       bass: Math.min(1.0, (bassSum / 18) / 255),
       mid: Math.min(1.0, (midSum / 162) / 255),
       high: Math.min(1.0, (highSum / 744) / 255),
-      impact: impact,
+      impact: impactRef.current,
     };
   }, [state.isPaused]);
 
