@@ -312,7 +312,17 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
     const transientThreshold = 1.3; // Requires a 30% volume spike to trigger
     if (currentRms > lastRmsRef.current * transientThreshold && currentRms > 0.05) {
       // Calculate how hard the spike was (normalized 0 to 1)
-      currentImpact = Math.min(1.0, (currentRms - (lastRmsRef.current * transientThreshold)) * 10.0);
+      const rawImpact = Math.min(1.0, (currentRms - (lastRmsRef.current * transientThreshold)) * 10.0);
+      
+      // THE "AND GATE" (Isolate Hi-Hats/Snares):
+      // Multiply the physical impact by the high-frequency energy.
+      // - Deep piano chord = high rawImpact, low highEnergy -> 0.2 (Suppressed)
+      // - Vocal sustain = low rawImpact, high highEnergy -> 0.0 (Suppressed)
+      // - Hi-hat hit = high rawImpact, high highEnergy -> 1.0 (Triggered!)
+      const highEnergy = Math.min(1.0, (highSum / 744) / 255);
+      
+      // Give it a small boost (e.g., 1.5x) since the multiplication naturally lowers the peak value
+      currentImpact = Math.min(1.0, rawImpact * highEnergy * 1.5);
     }
     
     // Smooth the impact so it acts like a spring (bounces up instantly, decays slowly)
