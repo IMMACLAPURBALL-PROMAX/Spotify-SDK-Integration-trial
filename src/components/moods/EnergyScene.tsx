@@ -177,8 +177,8 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState
     
     // When transitioning, multiply the float distance massively so they explode outward
     // During normal playback, the activePulse causes rhythmic micro-explosions
-    // SWEET SPOT: changed multiplier from 1.2 up to 2.5 (Original was 4.0)
-    const explosionForce = 1.0 + (transitionPeak * 25.0) + (activePulse * 2.5 * layerType);
+    // SWEET SPOT v3: bumped multiplier to 3.2 (Original was 4.0)
+    const explosionForce = 1.0 + (transitionPeak * 25.0) + (activePulse * 3.2 * layerType);
 
     // Add mouse parallax
     const parallaxX = (mouseLerped.current.x - 0.5) * -0.1 * layerType;
@@ -189,14 +189,14 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState
     mesh.position.y = (floatY * explosionForce) + parallaxY;
 
     // Add a chaotic tilt during the explosion
-    // SWEET SPOT: changed base rotation from 0.02 up to 0.035 (Original was 0.05)
-    mesh.rotation.z = (Math.sin(t * 2.0 + layerType) * 0.035) * explosionForce;
+    // SWEET SPOT v3: bumped base rotation to 0.042 (Original was 0.05)
+    mesh.rotation.z = (Math.sin(t * 2.0 + layerType) * 0.042) * explosionForce;
     mesh.rotation.x = (parallaxY * 2.0) + (transitionPeak * (layerType % 2 === 0 ? 0.2 : -0.2));
     mesh.rotation.y = (parallaxX * 2.0) + (transitionPeak * (layerType === 1 ? 0.2 : -0.2));
 
     // Scale up slightly during explosion to add depth
-    // SWEET SPOT: changed scale multiplier from 0.02 up to 0.035 (Original was 0.05)
-    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType) + (activePulse * 0.035 * layerType);
+    // SWEET SPOT v3: bumped scale multiplier to 0.042 (Original was 0.05)
+    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType) + (activePulse * 0.042 * layerType);
     mesh.scale.set(width * scalePulse, height * scalePulse, 1);
   });
 
