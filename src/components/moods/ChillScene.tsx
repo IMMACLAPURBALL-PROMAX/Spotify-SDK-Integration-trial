@@ -332,11 +332,20 @@ export function ChillScene({
       if (playbackState && (playbackState as any).getAudioData) {
         const data = (playbackState as any).getAudioData();
         if (data) {
-          // Use a gentle hi-hat pulse for sparkle expansion (less violent)
-          // Using 'impact' which detects sharp volume spikes instead of just high frequencies,
-          // meaning vocals won't trigger the sparkles, only percussive hits.
-          const hitPulse = data.impact * 0.25; 
-          sparklesRef.current.scale.setScalar(1.0 + hitPulse);
+          // Remove the scale 'zooming' (which causes the back-and-forth effect)
+          sparklesRef.current.scale.setScalar(1.0);
+          
+          // Instead of teleporting them randomly (which creates TV static / persistence of vision),
+          // use a high-speed sine wave so they smoothly but violently oscillate back and forth.
+          // The distance MUST be microscopic (0.015) so we don't accidentally scramble the noise texture!
+          if (data.impact > 0.1) {
+            const time = state.clock.elapsedTime;
+            sparklesRef.current.position.x = Math.sin(time * 50.0) * data.impact * 0.015;
+            sparklesRef.current.position.y = Math.cos(time * 45.0) * data.impact * 0.015;
+          } else {
+            // Smoothly settle back to origin
+            sparklesRef.current.position.lerp(new THREE.Vector3(0, 0, 1), 0.1);
+          }
         }
       }
     }

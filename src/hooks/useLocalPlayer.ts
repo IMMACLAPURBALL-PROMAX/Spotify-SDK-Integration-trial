@@ -121,6 +121,10 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
   const lastRmsRef = useRef<number>(0);
   const impactRef = useRef<number>(0);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  
+  // Cache the audio data per-frame so multiple components calling it don't cause double-decay
+  const lastProcessedTimeRef = useRef<number>(0);
+  const cachedAudioDataRef = useRef<any>(null);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const playlist = LOCAL_PLAYLISTS[mood];
@@ -276,7 +280,15 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
 
   // Expose frequency data for 3D scenes
   const getAudioData = useCallback((): AudioReactivityData | null => {
-    if (!analyserRef.current || !dataArrayRef.current || !timeDomainDataArrayRef.current || state.isPaused) return null;
+    if (!analyserRef.current || !dataArrayRef.current || !timeDomainDataArrayRef.current) return null;
+    if (state.isPaused) return null;
+
+    // Prevent multiple components from double-processing the audio data in the same frame (60fps = ~16ms)
+    const now = performance.now();
+    if (now - lastProcessedTimeRef.current < 10 && cachedAudioDataRef.current) {
+      return cachedAudioDataRef.current;
+    }
+    lastProcessedTimeRef.current = now;
     
     // Get Frequency Data (FFT)
     analyserRef.current.getByteFrequencyData(dataArrayRef.current as any);
@@ -335,14 +347,16 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
     // Slowly decay the lastRms so it creates a rolling average
     lastRmsRef.current = lastRmsRef.current * 0.8 + currentRms * 0.2;
 
-    // Normalize
-    return {
+    // Normalize and cache
+    cachedAudioDataRef.current = {
       subBass: Math.min(1.0, (subBassSum / 4) / 255),
       bass: Math.min(1.0, (bassSum / 18) / 255),
       mid: Math.min(1.0, (midSum / 162) / 255),
       high: Math.min(1.0, (highSum / 744) / 255),
       impact: impactRef.current,
     };
+    
+    return cachedAudioDataRef.current;
   }, [state.isPaused]);
 
   return {

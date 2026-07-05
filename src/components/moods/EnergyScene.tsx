@@ -171,7 +171,20 @@ function KineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState
     const transitionPeak = Math.sin(textures.progress.value * Math.PI);
     
     // 3. Audio Reactivity Pulse
-    const pulse = updatePulse(delta, playbackState || null);
+    // If we have real Web Audio API data (Local MP3 mode), use it!
+    // If we are connected to Spotify (which deprecated its audio analyzer), fallback to the synthetic 120BPM pulse.
+    let pulse = 0;
+    if (playbackState && (playbackState as any).getAudioData) {
+      const data = (playbackState as any).getAudioData();
+      if (data) {
+        // Use a mix of raw bass and transient impact to drive the explosive geometry
+        pulse = data.bass * 0.7 + data.impact * 0.3;
+      }
+    } else {
+      // Spotify Fallback: Fake 120BPM metronome
+      pulse = updatePulse(delta, playbackState || null);
+    }
+    
     // Suppress audio pulse during the massive track transition so they don't fight
     const activePulse = (1.0 - transitionPeak) * pulse;
     
