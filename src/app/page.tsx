@@ -225,7 +225,7 @@ export default function Home() {
     isPaused: playerState.isPaused,
     volume: playerState.volume,
     durationMs: playerState.currentTrack.durationMs,
-    getAudioData: getAudioData || (() => null)
+    getAudioData: getAudioData || undefined
   } : null;
 
   return (
