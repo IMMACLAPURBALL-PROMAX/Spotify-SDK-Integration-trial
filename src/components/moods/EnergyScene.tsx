@@ -206,9 +206,16 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
 
   const mouseLerped = useRef(new THREE.Vector2(0.5, 0.5));
   const timeRef = useRef(Math.random() * 100);
-  
-  const lastBassRef = useRef(0);
-  const bassTransientRef = useRef(0);
+
+  // Transient Kick Detector State
+  const prevLowRef = useRef(0);
+  const kickPulseRef = useRef(0);
+
+  // Bass Breathing State
+  const smoothBassRef = useRef(0);
+
+  // Mid Orbital Drift State
+  const smoothMidRef = useRef(0);
 
   const uniforms = useMemo(
     () => ({
@@ -240,48 +247,103 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
 
     mouseLerped.current.lerp(mouseTarget.current, 0.08);
 
+    // ════════════════════════════════════════
+    // Read audio data ONCE per frame
+    // ════════════════════════════════════════
+    let currentSubBass = 0;
+    let currentBass = 0;
+    let currentMid = 0;
+    let currentImpact = 0;
+
+    if (playbackState && (playbackState as any).getAudioData) {
+      const data = (playbackState as any).getAudioData();
+      if (data) {
+        currentSubBass = data.subBass;
+        currentBass = data.bass;
+        currentMid = data.mid;
+        currentImpact = data.impact;
+      }
+    }
+
+    // ── 1. The Heavy Punch (Sub-Bass + Bass) ──
+    const combinedLowEnd = Math.max(currentSubBass, currentBass);
+    
+    // True Transient Detector (Frame-to-frame delta)
+    const lowDelta = Math.max(0, combinedLowEnd - prevLowRef.current);
+    prevLowRef.current = combinedLowEnd;
+
+    // Multiply the spike so a typical kick jumps up rapidly
+    kickPulseRef.current = Math.min(1.0, kickPulseRef.current + lowDelta * 4.0);
+    // Extreme exponential decay (returns to 0 quickly even if 808 stays loud)
+    kickPulseRef.current *= 0.78; 
+    const kickPulse = kickPulseRef.current;
+
+    // ── 2. Scale Pop (Bass) ──
+    const targetBass = Math.pow(currentBass, 1.2);
+    smoothBassRef.current += (targetBass - smoothBassRef.current) * 0.2;
+    const bassBreath = smoothBassRef.current;
+
+    // ── 3. Color Drift (Mids) ──
+    smoothMidRef.current += (currentMid - smoothMidRef.current) * 0.08;
+    const orbitalRadius = 0.02 + smoothMidRef.current * 0.02;
+
+    // ── 4. Edge Flicker (Highs) Option B ──
+    let flickerX = 0;
+    let flickerY = 0;
+    if (currentImpact > 0.1 && layerType > 0) {
+      // Create a sharp visual glitch that snaps back instantly
+      const sparkDir = layerType % 2 === 0 ? 1 : -1;
+      flickerX = sparkDir * currentImpact * 0.012;
+      flickerY = -sparkDir * currentImpact * 0.012;
+    }
+
+    // ── Base Float (Circle) ──
     let floatX = 0;
     let floatY = 0;
     if (layerType > 0) {
       const speed = 0.5;
-      const radius = 0.02;
-      floatX = Math.sin(t * speed + layerType * 2.0) * radius;
-      floatY = Math.cos(t * speed * 1.2 + layerType * 2.0) * radius;
+      floatX = Math.sin(t * speed + layerType * 2.0) * orbitalRadius;
+      floatY = Math.cos(t * speed * 1.2 + layerType * 2.0) * orbitalRadius;
     }
 
+    // ── Transition slam ──
     const transitionPeak = Math.sin(textures.progress.value * Math.PI);
-    
-    let pulse = 0;
-    if (playbackState && (playbackState as any).getAudioData) {
-      const data = (playbackState as any).getAudioData();
-      if (data) {
-        const bassDelta = Math.max(0, data.bass - lastBassRef.current);
-        lastBassRef.current = data.bass;
+    const transitionForce = 1.0 + (transitionPeak * 25.0);
 
-        if (bassDelta > 0.02) {
-          bassTransientRef.current = Math.min(1.0, bassTransientRef.current + bassDelta * 4.0);
-        }
-        
-        bassTransientRef.current *= 0.85;
-        pulse = bassTransientRef.current * 0.7 + data.impact * 0.3;
-      }
+    // Apply transition force to float
+    floatX *= transitionForce;
+    floatY *= transitionForce;
+
+    // ── Decoupled Straight-Line Punch ──
+    // Instead of multiplying the circle, we push straight out from the center
+    const punchAngle = layerType * ((Math.PI * 2) / 3); // 0, 120, 240 degrees spread
+    const punchForce = kickPulse * 0.12; // The max distance of the punch
+    let punchX = 0;
+    let punchY = 0;
+    if (layerType > 0) {
+      punchX = Math.cos(punchAngle) * punchForce;
+      punchY = Math.sin(punchAngle) * punchForce;
     }
 
-    const activePulse = (1.0 - transitionPeak) * pulse;
-    
-    const explosionForce = 1.0 + (transitionPeak * 25.0) + (activePulse * 3.2 * layerType);
-
+    // Parallax
     const parallaxX = (mouseLerped.current.x - 0.5) * -0.1 * layerType;
     const parallaxY = (mouseLerped.current.y - 0.5) * -0.1 * layerType;
 
-    mesh.position.x = (floatX * explosionForce) + parallaxX;
-    mesh.position.y = (floatY * explosionForce) + parallaxY;
+    // Assemble final position
+    mesh.position.x = floatX + punchX + flickerX + parallaxX;
+    mesh.position.y = floatY + punchY + flickerY + parallaxY;
 
-    mesh.rotation.z = (Math.sin(t * 2.0 + layerType) * 0.042) * explosionForce;
+    // Rotation
+    const rotForce = transitionForce + (kickPulse * 2.0 * layerType);
+    mesh.rotation.z = (Math.sin(t * 2.0 + layerType) * 0.042) * rotForce;
     mesh.rotation.x = (parallaxY * 2.0) + (transitionPeak * (layerType % 2 === 0 ? 0.2 : -0.2));
     mesh.rotation.y = (parallaxX * 2.0) + (transitionPeak * (layerType === 1 ? 0.2 : -0.2));
 
-    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType) + (activePulse * 0.042 * layerType);
+    // Scale
+    const scalePulse = 1.0 
+      + (transitionPeak * 0.15 * layerType) 
+      + (bassBreath * 0.04 * layerType)
+      + (kickPulse * 0.02 * layerType);
     mesh.scale.set(width * scalePulse, height * scalePulse, 1);
   });
 
