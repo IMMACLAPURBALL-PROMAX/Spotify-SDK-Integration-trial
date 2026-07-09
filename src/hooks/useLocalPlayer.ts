@@ -70,15 +70,59 @@ export const LOCAL_PLAYLISTS = {
     }
   ],
   energy: [
-    // Fallback tracks for Energy until you upload specific Energy tracks
     {
       id: "local-energy-1",
-      name: "LUNCH",
-      primaryArtist: "Billie Eilish",
+      name: "4 Raws",
+      primaryArtist: "EsDeeKid",
       featuredArtists: [],
-      albumName: "HIT ME HARD AND SOFT",
-      albumArtUrl: "/images/billie5.jpg",
-      audioUrl: "/audio/billie-eilish-lunch.mp3",
+      albumName: "Rebel",
+      albumArtUrl: "/images/Rebel-4raws.webp",
+      audioUrl: "/audio/4 Raws.mp3",
+    },
+    {
+      id: "local-energy-2",
+      name: "In Da Club",
+      primaryArtist: "50 Cent",
+      featuredArtists: [],
+      albumName: "Get Rich or Die Tryin'",
+      albumArtUrl: "/images/In Da Club.jpg",
+      audioUrl: "/audio/50 Cent - In Da Club (Official Music Video).mp3",
+    },
+    {
+      id: "local-energy-3",
+      name: "Clash",
+      primaryArtist: "Dave",
+      featuredArtists: ["Stormzy"],
+      albumName: "We're All Alone In This Together",
+      albumArtUrl: "/images/dave-WERE-ALL-ALONE-IN-THIS-TOGETHER-.jpeg",
+      audioUrl: "/audio/Dave - Clash (ft. Stormzy).mp3",
+    },
+    {
+      id: "local-energy-4",
+      name: "Jimmy Cooks",
+      primaryArtist: "Drake",
+      featuredArtists: ["21 Savage"],
+      albumName: "Honestly, Nevermind",
+      albumArtUrl: "/images/Honestly Nevermind.webp",
+      audioUrl: "/audio/Drake - Jimmy Cooks (Audio) ft. 21 Savage.mp3",
+    },
+    {
+      id: "local-energy-5",
+      name: "MURDER IN MY MIND",
+      primaryArtist: "KORDHELL",
+      featuredArtists: [],
+      albumName: "Murder In My Mind",
+      albumArtUrl: "/images/Kordhell cover art.avif",
+      audioUrl: "/audio/KORDHELL - MURDER IN MY MIND.mp3",
+    },
+    {
+      id: "local-energy-6",
+      name: "DIOR",
+      primaryArtist: "POP SMOKE",
+      featuredArtists: [],
+      albumName: "Meet The Woo",
+      albumArtUrl: "/images/Dior.webp",
+      audioUrl: "/audio/POP SMOKE - DIOR (OFFICIAL VIDEO).mp3",
     }
   ],
   focus: [
@@ -116,6 +160,7 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
   const timeDomainDataArrayRef = useRef<Uint8Array | null>(null);
   const lastRmsRef = useRef<number>(0);
@@ -230,9 +275,21 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
       analyserRef.current = audioCtxRef.current.createAnalyser();
       analyserRef.current.fftSize = 4096; // 2048 bins, ~10.7Hz per bin
       
+      gainNodeRef.current = audioCtxRef.current.createGain();
+      gainNodeRef.current.gain.value = state.volume; // Initialize to current UI volume
+      
+      // CRITICAL: Force audio element to full volume so the Analyser always
+      // receives the full-strength signal. The GainNode above controls the
+      // actual speaker output. Without this, if the user changed volume
+      // before pressing play (via the fallback path), audioRef.volume would
+      // still be reduced, double-attenuating the analyser input.
+      audioRef.current.volume = 1.0;
+      
       sourceNodeRef.current = audioCtxRef.current.createMediaElementSource(audioRef.current);
+      // Route: MediaElement (1.0) → Analyser (full signal) → GainNode (UI volume) → Speakers
       sourceNodeRef.current.connect(analyserRef.current);
-      analyserRef.current.connect(audioCtxRef.current.destination);
+      analyserRef.current.connect(gainNodeRef.current);
+      gainNodeRef.current.connect(audioCtxRef.current.destination);
 
       dataArrayRef.current = new Uint8Array(analyserRef.current.frequencyBinCount);
       timeDomainDataArrayRef.current = new Uint8Array(analyserRef.current.fftSize);
@@ -272,10 +329,15 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
   }, []);
 
   const setVolume = useCallback(async (volume: number) => {
-    if (audioRef.current) {
+    // We do NOT change audioRef.current.volume because we want the AnalyserNode to always receive a 1.0 full-scale signal.
+    // Instead, we adjust the Web Audio GainNode which controls the speaker output after the analyzer.
+    if (gainNodeRef.current) {
+      gainNodeRef.current.gain.value = volume;
+    } else if (audioRef.current) {
+      // Fallback if Web Audio isn't initialized yet
       audioRef.current.volume = volume;
-      setState(s => ({ ...s, volume }));
     }
+    setState(s => ({ ...s, volume }));
   }, []);
 
   // Expose frequency data for 3D scenes
