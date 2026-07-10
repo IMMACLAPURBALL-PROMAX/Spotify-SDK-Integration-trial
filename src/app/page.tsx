@@ -231,14 +231,13 @@ export default function Home() {
   return (
     <>
       <div id="main" onClick={handleMainClick}>
-        <LiquidBackground
-          currentTrackUrl={currentBgUrl}
-          hoverTrackUrl={nextBgUrl}
-          mood={mood}
-          playbackState={playbackState}
-        />
-
         <div id="top">
+          <LiquidBackground
+            currentTrackUrl={currentBgUrl}
+            hoverTrackUrl={nextBgUrl}
+            mood={mood}
+            playbackState={playbackState}
+          />
           <div id="workingarea">
             <div id="nav" className={brightness.navIsLight ? "force-pill" : ""}>
               <div id="nleft">

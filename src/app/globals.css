@@ -291,10 +291,8 @@ body, html {
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    position: absolute;
-    top: 52%;
-    transform: translateY(-50%);
-    left: 0;
+    position: relative;
+    margin: auto 0;
 }
 
 /* Force hero text to Spotify Black when background is light */
@@ -427,14 +425,16 @@ body, html {
     justify-content: space-between;
     pointer-events: all;
 
-    /* Modern Glassmorphic panel foundation */
-    background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    /* Premium Frosted Glassmorphism */
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     padding: 25px;
     border-radius: 20px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    box-shadow: 
+        0 24px 50px rgba(0, 0, 0, 0.35),
+        inset 0 1px 1px rgba(255, 255, 255, 0.2);
 }
 
 /* Header Text formatting */
