@@ -71,15 +71,6 @@ export const LOCAL_PLAYLISTS = {
   ],
   energy: [
     {
-      id: "local-energy-1",
-      name: "4 Raws",
-      primaryArtist: "EsDeeKid",
-      featuredArtists: [],
-      albumName: "Rebel",
-      albumArtUrl: "/images/Rebel-4raws.webp",
-      audioUrl: "/audio/4 Raws.mp3",
-    },
-    {
       id: "local-energy-2",
       name: "In Da Club",
       primaryArtist: "50 Cent",

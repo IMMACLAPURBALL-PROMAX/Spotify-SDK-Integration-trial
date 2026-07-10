@@ -208,7 +208,8 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
   const timeRef = useRef(Math.random() * 100);
 
   // Transient Kick Detector State
-  const prevLowRef = useRef(0);
+  const prevSubRef = useRef(0);
+  const prevBassRef = useRef(0);
   const kickPulseRef = useRef(0);
 
   // Bass Breathing State
@@ -216,6 +217,12 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
 
   // Mid Orbital Drift State
   const smoothMidRef = useRef(0);
+
+  // Hi-Hat State
+  const prevImpactRef = useRef(0);
+  const hiHatCountRef = useRef(0);
+  const topLayerLerpRef = useRef(0);
+  const lastCycleTimeRef = useRef(0);
 
   const uniforms = useMemo(
     () => ({
@@ -266,14 +273,23 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
     }
 
     // ── 1. The Heavy Punch (Sub-Bass + Bass) ──
-    const combinedLowEnd = Math.max(currentSubBass, currentBass);
+    // Detect jumps independently so a flatlined 808 sub-bass doesn't bury the bass kick
+    const subDelta = Math.max(0, currentSubBass - prevSubRef.current);
+    const bassDelta = Math.max(0, currentBass - prevBassRef.current);
     
-    // True Transient Detector (Frame-to-frame delta)
-    const lowDelta = Math.max(0, combinedLowEnd - prevLowRef.current);
-    prevLowRef.current = combinedLowEnd;
+    prevSubRef.current = currentSubBass;
+    prevBassRef.current = currentBass;
+
+    // Filter out noisy micro-fluctuations — only real kicks pass through
+    const filteredSubDelta = subDelta > 0.05 ? subDelta : 0;
+    const filteredBassDelta = bassDelta > 0.05 ? bassDelta : 0;
+
+    // Sub-bass triggers at 100% power (massive explosion).
+    // Bass triggers at 30% power (minor sway/pop).
+    const combinedDelta = filteredSubDelta + (filteredBassDelta * 0.3);
 
     // Multiply the spike so a typical kick jumps up rapidly
-    kickPulseRef.current = Math.min(1.0, kickPulseRef.current + lowDelta * 4.0);
+    kickPulseRef.current = Math.min(1.0, kickPulseRef.current + combinedDelta * 3.0);
     // Extreme exponential decay (returns to 0 quickly even if 808 stays loud)
     kickPulseRef.current *= 0.78; 
     const kickPulse = kickPulseRef.current;
@@ -287,23 +303,39 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
     smoothMidRef.current += (currentMid - smoothMidRef.current) * 0.08;
     const orbitalRadius = 0.02 + smoothMidRef.current * 0.02;
 
-    // ── 4. Edge Flicker (Highs) Option B ──
-    let flickerX = 0;
-    let flickerY = 0;
-    if (currentImpact > 0.1 && layerType > 0) {
-      // Create a sharp visual glitch that snaps back instantly
-      const sparkDir = layerType % 2 === 0 ? 1 : -1;
-      flickerX = sparkDir * currentImpact * 0.012;
-      flickerY = -sparkDir * currentImpact * 0.012;
+    // ── 4. Color Cycling (Highs) ──
+
+    // Detect sharp hi-hat hit to cycle colors (with 300ms cooldown)
+    const now = performance.now();
+    if (currentImpact > 0.2 && prevImpactRef.current <= 0.2 && (now - lastCycleTimeRef.current) > 300) {
+      hiHatCountRef.current += 1;
+      lastCycleTimeRef.current = now;
     }
+    prevImpactRef.current = currentImpact;
+
+    // Determine Z-Index & Top Layer
+    let dynamicZ = zOffset;
+    let isTopLayer = false;
+    if (layerType > 0) {
+      const zIndex = ((layerType - 1 + hiHatCountRef.current) % 3) + 1; // 1, 2, or 3
+      dynamicZ = zIndex * 0.01;
+      isTopLayer = (zIndex === 3); // 3 is the top-most Z-index
+    }
+
+    // Smoothly transition between 0.0 (normal) and 1.0 (top layer) to prevent violent shaking
+    const targetTop = isTopLayer ? 1.0 : 0.0;
+    topLayerLerpRef.current += (targetTop - topLayerLerpRef.current) * 0.15;
+    const topLerp = topLayerLerpRef.current;
 
     // ── Base Float (Circle) ──
     let floatX = 0;
     let floatY = 0;
     if (layerType > 0) {
       const speed = 0.5;
-      floatX = Math.sin(t * speed + layerType * 2.0) * orbitalRadius;
-      floatY = Math.cos(t * speed * 1.2 + layerType * 2.0) * orbitalRadius;
+      // Make the top layer orbit slightly wider so its color forms a visible halo (smoothly interpolated)
+      const activeRadius = orbitalRadius * (1.0 + (topLerp * 1.5)); 
+      floatX = Math.sin(t * speed + layerType * 2.0) * activeRadius;
+      floatY = Math.cos(t * speed * 1.2 + layerType * 2.0) * activeRadius;
     }
 
     // ── Transition slam ──
@@ -315,9 +347,8 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
     floatY *= transitionForce;
 
     // ── Decoupled Straight-Line Punch ──
-    // Instead of multiplying the circle, we push straight out from the center
-    const punchAngle = layerType * ((Math.PI * 2) / 3); // 0, 120, 240 degrees spread
-    const punchForce = kickPulse * 0.12; // The max distance of the punch
+    const punchAngle = layerType * ((Math.PI * 2) / 3); 
+    const punchForce = kickPulse * 0.12; 
     let punchX = 0;
     let punchY = 0;
     if (layerType > 0) {
@@ -330,11 +361,12 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
     const parallaxY = (mouseLerped.current.y - 0.5) * -0.1 * layerType;
 
     // Assemble final position
-    mesh.position.x = floatX + punchX + flickerX + parallaxX;
-    mesh.position.y = floatY + punchY + flickerY + parallaxY;
+    mesh.position.x = floatX + punchX + parallaxX;
+    mesh.position.y = floatY + punchY + parallaxY;
+    mesh.position.z = dynamicZ;
 
     // Rotation
-    const rotForce = transitionForce + (kickPulse * 2.0 * layerType);
+    const rotForce = transitionForce; // Removed kickPulse to stop chaotic twisting/shaking
     mesh.rotation.z = (Math.sin(t * 2.0 + layerType) * 0.042) * rotForce;
     mesh.rotation.x = (parallaxY * 2.0) + (transitionPeak * (layerType % 2 === 0 ? 0.2 : -0.2));
     mesh.rotation.y = (parallaxX * 2.0) + (transitionPeak * (layerType === 1 ? 0.2 : -0.2));
@@ -343,7 +375,8 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
     const scalePulse = 1.0 
       + (transitionPeak * 0.15 * layerType) 
       + (bassBreath * 0.04 * layerType)
-      + (kickPulse * 0.02 * layerType);
+      + (kickPulse * 0.02 * layerType)
+      + (topLerp * 0.015); // Smoothly interpolated tiny scale boost
     mesh.scale.set(width * scalePulse, height * scalePulse, 1);
   });
 
