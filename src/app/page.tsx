@@ -318,6 +318,7 @@ export default function Home() {
                 currentSlideIndex={currentSlideIndex}
                 staticImages={STATIC_IMAGES}
                 staticTrackData={STATIC_TRACK_DATA}
+                backgroundUrl={currentBgUrl}
               />
             </div>
           </div>

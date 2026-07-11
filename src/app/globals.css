@@ -424,17 +424,37 @@ body, html {
     min-height: 58vh;
     justify-content: space-between;
     pointer-events: all;
+    position: relative;
+    overflow: hidden;
 
-    /* Premium Frosted Glassmorphism */
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(25px) saturate(180%);
-    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    /* Transparent base — the .glass-bg div provides the frosted look */
+    background: transparent;
     border: 1px solid rgba(255, 255, 255, 0.12);
     padding: 25px;
     border-radius: 20px;
     box-shadow: 
         0 24px 50px rgba(0, 0, 0, 0.35),
-        inset 0 1px 1px rgba(255, 255, 255, 0.2);
+        inset 0 1px 1px rgba(255, 255, 255, 0.15);
+}
+
+/* Frosted glass background — blurred album art clipped to card shape */
+#heroright .glass-bg {
+    position: absolute;
+    top: -20px;
+    left: -20px;
+    right: -20px;
+    bottom: -20px;
+    background-size: cover;
+    background-position: center;
+    filter: blur(40px) brightness(0.4) saturate(1.6);
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* Ensure all card content sits above the frosted glass */
+#heroright > *:not(.glass-bg) {
+    position: relative;
+    z-index: 2;
 }
 
 /* Header Text formatting */

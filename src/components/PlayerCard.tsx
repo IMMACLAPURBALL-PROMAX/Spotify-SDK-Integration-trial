@@ -15,6 +15,7 @@ interface PlayerCardProps {
   currentSlideIndex: number;
   staticImages: string[];
   staticTrackData: any[];
+  backgroundUrl: string;
 }
 
 export function PlayerCard({
@@ -25,6 +26,7 @@ export function PlayerCard({
   currentSlideIndex,
   staticImages,
   staticTrackData,
+  backgroundUrl,
 }: PlayerCardProps) {
   // Playback slider dragging state (Moved from page.tsx!)
   const [isDraggingProgress, setIsDraggingProgress] = useState(false);
@@ -75,6 +77,11 @@ export function PlayerCard({
 
   return (
     <div id="heroright" onClick={(e) => e.stopPropagation()}>
+      {/* Frosted glass background — blurred album art behind the card content */}
+      <div
+        className="glass-bg"
+        style={{ backgroundImage: `url(${backgroundUrl})` }}
+      />
       <p>{nowPlayingLabel}</p>
 
       <div className="imagediv">
