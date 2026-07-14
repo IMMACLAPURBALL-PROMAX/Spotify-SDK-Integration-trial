@@ -149,6 +149,7 @@ export interface AudioReactivityData {
 
 export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: boolean) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const volumeRef = useRef<number>(0.5); // Add ref to avoid stale closures
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
@@ -267,7 +268,7 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
       analyserRef.current.fftSize = 4096; // 2048 bins, ~10.7Hz per bin
       
       gainNodeRef.current = audioCtxRef.current.createGain();
-      gainNodeRef.current.gain.value = state.volume; // Initialize to current UI volume
+      gainNodeRef.current.gain.value = volumeRef.current; // Use ref instead of stale state.volume
       
       // CRITICAL: Force audio element to full volume so the Analyser always
       // receives the full-strength signal. The GainNode above controls the
@@ -320,6 +321,7 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
   }, []);
 
   const setVolume = useCallback(async (volume: number) => {
+    volumeRef.current = volume; // Update ref for closures
     // We do NOT change audioRef.current.volume because we want the AnalyserNode to always receive a 1.0 full-scale signal.
     // Instead, we adjust the Web Audio GainNode which controls the speaker output after the analyzer.
     if (gainNodeRef.current) {
@@ -400,13 +402,14 @@ export function useLocalPlayer(mood: "chill" | "energy" | "focus", isEnabled: bo
     // Slowly decay the lastRms so it creates a rolling average
     lastRmsRef.current = lastRmsRef.current * 0.8 + currentRms * 0.2;
 
-    // Normalize and cache
+    // Normalize and cache, scaling by current volume so animations stop at vol 0
+    const volScale = volumeRef.current;
     cachedAudioDataRef.current = {
-      subBass: Math.min(1.0, (subBassSum / 4) / 255),
-      bass: Math.min(1.0, (bassSum / 18) / 255),
-      mid: Math.min(1.0, (midSum / 162) / 255),
-      high: Math.min(1.0, (highSum / 744) / 255),
-      impact: impactRef.current,
+      subBass: Math.min(1.0, (subBassSum / 4) / 255) * volScale,
+      bass: Math.min(1.0, (bassSum / 18) / 255) * volScale,
+      mid: Math.min(1.0, (midSum / 162) / 255) * volScale,
+      high: Math.min(1.0, (highSum / 744) / 255) * volScale,
+      impact: impactRef.current * volScale,
     };
     
     return cachedAudioDataRef.current;

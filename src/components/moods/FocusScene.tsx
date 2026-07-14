@@ -4,6 +4,8 @@ import React, { useRef, useMemo } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { TrackTextures } from "@/hooks/useTrackTextures";
+import { useSyntheticPulse, PlaybackState } from "@/hooks/useSyntheticPulse";
+import type { AccessibilitySettings } from "@/contexts/AccessibilityContext";
 
 // ──────────────────────────────────────────
 //  Props
@@ -13,7 +15,9 @@ interface FocusSceneProps {
   textures: TrackTextures;
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   hoverActive: boolean;
-  playbackState?: any;
+  playbackState?: PlaybackState | null;
+  boostValues: { bass: number; mids: number; highs: number };
+  accessibility?: AccessibilitySettings;
 }
 
 // ──────────────────────────────────────────
@@ -162,12 +166,16 @@ function GeometricFrame({
   color,
   playbackState,
   reactive,
+  boostValues,
+  accessibility,
 }: {
   scale: number;
   zOffset: number;
   color: string;
   playbackState?: any;
   reactive: boolean;
+  boostValues: { bass: number; mids: number; highs: number };
+  accessibility?: AccessibilitySettings;
 }) {
   const { width, height } = useThree((s) => s.viewport);
   const lineRef = useRef<THREE.LineSegments>(null);
@@ -200,13 +208,80 @@ function GeometricFrame({
     if (reactive && playbackState && (playbackState as any).getAudioData) {
       const data = (playbackState as any).getAudioData();
       if (data) {
-        bassValue = data.bass;
+        bassValue = data.bass * boostValues.bass;
       }
     }
 
     // Smooth the bass for a gentle breath
     smoothBassRef.current += (bassValue - smoothBassRef.current) * 0.06;
-    const breath = reactive ? smoothBassRef.current * 0.015 : 0;
+    const breath = (reactive && accessibility?.frameBreathing !== false) ? smoothBassRef.current * 0.015 : 0;
+
+    const sx = width * scale + breath;
+    const sy = height * scale + breath;
+    line.scale.set(sx, sy, 1);
+  });
+
+  return (
+    <lineSegments ref={lineRef} geometry={geometry} position={[0, 0, zOffset]}>
+      <lineBasicMaterial color={color} transparent opacity={0.25} />
+    </lineSegments>
+  );
+}
+
+// ──────────────────────────────────────────
+//  Synthetic Geometric Frame (Spotify mode — no Web Audio)
+// ──────────────────────────────────────────
+
+function SyntheticGeometricFrame({
+  scale,
+  zOffset,
+  color,
+  playbackState,
+  reactive,
+  boostValues,
+  accessibility,
+}: {
+  scale: number;
+  zOffset: number;
+  color: string;
+  playbackState?: PlaybackState | null;
+  reactive: boolean;
+  boostValues: { bass: number; mids: number; highs: number };
+  accessibility?: AccessibilitySettings;
+}) {
+  const { width, height } = useThree((s) => s.viewport);
+  const lineRef = useRef<THREE.LineSegments>(null);
+  const smoothBassRef = useRef(0);
+  const { update: updatePulse } = useSyntheticPulse(120);
+
+  // Build a rectangle out of line segments
+  const geometry = useMemo(() => {
+    const hw = 0.5;
+    const hh = 0.5;
+    const points = [
+      -hw, -hh, 0, hw, -hh, 0,
+      hw, -hh, 0, hw, hh, 0,
+      hw, hh, 0, -hw, hh, 0,
+      -hw, hh, 0, -hw, -hh, 0,
+    ];
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(points, 3));
+    return geo;
+  }, []);
+
+  useFrame((_state, delta) => {
+    const line = lineRef.current;
+    if (!line) return;
+
+    let bassValue = 0;
+    if (reactive) {
+      const pulse = updatePulse(delta, playbackState || null);
+      bassValue = pulse;
+    }
+
+    // Smooth the bass for a gentle breath
+    smoothBassRef.current += (bassValue - smoothBassRef.current) * 0.06;
+    const breath = (reactive && accessibility?.frameBreathing !== false) ? smoothBassRef.current * 0.015 : 0;
 
     const sx = width * scale + breath;
     const sy = height * scale + breath;
@@ -224,7 +299,13 @@ function GeometricFrame({
 //  Main Export
 // ──────────────────────────────────────────
 
-export function FocusScene({ textures, mouseTarget, hoverActive, playbackState }: FocusSceneProps) {
+export function FocusScene({ textures, mouseTarget, hoverActive, playbackState, boostValues, accessibility }: FocusSceneProps) {
+  const hasLiveAudio = playbackState && (playbackState as any).getAudioData;
+
+  // The inner frame is always static (reactive=false), so it doesn't need a synthetic variant.
+  // The outer frame breathes with bass — use synthetic when no live audio.
+  const ReactiveFrame = hasLiveAudio ? GeometricFrame : SyntheticGeometricFrame;
+
   return (
     <>
       {/* Single, clean album art */}
@@ -237,15 +318,19 @@ export function FocusScene({ textures, mouseTarget, hoverActive, playbackState }
         color="#ccaa77"
         playbackState={playbackState}
         reactive={false}
+        boostValues={boostValues}
+        accessibility={accessibility}
       />
 
       {/* Outer frame — barely breathes with bass */}
-      <GeometricFrame
+      <ReactiveFrame
         scale={0.82}
         zOffset={0.02}
         color="#ccaa77"
         playbackState={playbackState}
         reactive={true}
+        boostValues={boostValues}
+        accessibility={accessibility}
       />
     </>
   );

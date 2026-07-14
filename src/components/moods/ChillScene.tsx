@@ -5,6 +5,8 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Float, Sparkles } from "@react-three/drei";
 import type { TrackTextures } from "@/hooks/useTrackTextures";
+import type { AccessibilitySettings } from "@/contexts/AccessibilityContext";
+import { useSyntheticPulse, PlaybackState } from "@/hooks/useSyntheticPulse";
 
 // ──────────────────────────────────────────
 //  Props
@@ -14,7 +16,9 @@ interface ChillSceneProps {
   textures: TrackTextures;
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   hoverActive: boolean;
-  playbackState?: any;
+  playbackState?: PlaybackState | null;
+  accessibility?: AccessibilitySettings;
+  boostValues: { bass: number; mids: number; highs: number };
 }
 
 // ──────────────────────────────────────────
@@ -234,10 +238,12 @@ interface ChillPlaneProps {
   layerType: 0 | 1 | 2;
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   zOffset: number;
-  playbackState?: any;
+  playbackState?: PlaybackState | null;
+  accessibility?: AccessibilitySettings;
+  boostValues: { bass: number; mids: number; highs: number };
 }
 
-function ChillPlane({ textures, layerType, mouseTarget, zOffset, playbackState }: ChillPlaneProps) {
+function ChillPlane({ textures, layerType, mouseTarget, zOffset, playbackState, accessibility, boostValues }: ChillPlaneProps) {
   const { width, height } = useThree((s) => s.viewport);
   const size = useThree((s) => s.size);
   const meshRef = useRef<THREE.Mesh>(null);
@@ -306,23 +312,28 @@ function ChillPlane({ textures, layerType, mouseTarget, zOffset, playbackState }
       const data = (playbackState as any).getAudioData();
       if (data) {
         // Isolate standard bass (musicality) - Intensity increased for testing
-        bass = Math.pow(data.bass, 1.2) * 2.0;
+        bass = Math.pow(data.bass, 1.2) * 2.0 * boostValues.bass;
 
         // Subwoofer effect: Fast attack, slow calm decay
-        const rawSub = Math.pow(data.subBass, 2.0) * 0.5; // Restored to 0.5
+        const rawSub = Math.pow(data.subBass, 2.0) * 0.5 * boostValues.bass; // Restored to 0.5
         if (rawSub > subBassRef.current) {
           subBassRef.current = THREE.MathUtils.lerp(subBassRef.current, rawSub, 0.6); // Snappy punch
         } else {
           subBassRef.current = THREE.MathUtils.lerp(subBassRef.current, rawSub, 0.04); // Calm, slow decay
         }
 
-        mid = data.mid;
-        high = data.high;
+        mid = data.mid * boostValues.mids;
+        high = data.high * boostValues.highs;
       }
     }
 
     // Apply the standard bass with normal smoothing, but add the raw subBassRef directly so it retains its snappy punch
-    mat.uniforms.uBass.value = THREE.MathUtils.lerp(mat.uniforms.uBass.value, bass, 0.2) + subBassRef.current;
+    // When imageBreathing is OFF, zero out the bass uniform so the shader's UV breathing stops
+    if (accessibility?.imageBreathing !== false) {
+      mat.uniforms.uBass.value = THREE.MathUtils.lerp(mat.uniforms.uBass.value, bass, 0.2) + subBassRef.current;
+    } else {
+      mat.uniforms.uBass.value = THREE.MathUtils.lerp(mat.uniforms.uBass.value, 0, 0.15);
+    }
     mat.uniforms.uMid.value = THREE.MathUtils.lerp(mat.uniforms.uMid.value, mid, 0.1);
     mat.uniforms.uHigh.value = THREE.MathUtils.lerp(mat.uniforms.uHigh.value, high, 0.2);
 
@@ -477,6 +488,226 @@ function ChillPlane({ textures, layerType, mouseTarget, zOffset, playbackState }
 }
 
 // ──────────────────────────────────────────
+//  Synthetic Chill Plane (Spotify mode — no Web Audio)
+// ──────────────────────────────────────────
+
+function SyntheticChillPlane({ textures, layerType, mouseTarget, zOffset, playbackState, accessibility, boostValues }: ChillPlaneProps) {
+  const { width, height } = useThree((s) => s.viewport);
+  const size = useThree((s) => s.size);
+  const meshRef = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<THREE.ShaderMaterial>(null);
+  const mouseLerped = useRef(new THREE.Vector2(0.5, 0.5));
+  const timeRef = useRef(Math.random() * 100);
+
+  // Synthetic pulse replaces Web Audio API
+  const { update: updatePulse } = useSyntheticPulse(120);
+
+  // Liquid gooey glass lens simulation state
+  const pxRef = useRef(0.5);
+  const pyRef = useRef(0.5);
+  const vxRef = useRef(0);
+  const vyRef = useRef(0);
+  const stretchRef = useRef(0);
+  const wobbleRef = useRef(0);
+  const wobbleVelRef = useRef(0);
+  const dirRef = useRef(new THREE.Vector2(0, 1));
+  
+  // Mouse cursor tracking for noise-free velocity
+  const smoothMouseRef = useRef(new THREE.Vector2(0.5, 0.5));
+  const smoothMouseSpeedRef = useRef(0);
+
+  const uniforms = useMemo(
+    () => ({
+      uTexture1:     { value: fallbackTex },
+      uTexture2:     { value: fallbackTex },
+      uHoverTexture: { value: fallbackTex },
+      uProgress:     { value: 0 },
+      uResolution:   { value: new THREE.Vector2(1, 1) },
+      uImageRes1:    { value: new THREE.Vector2(1, 1) },
+      uImageRes2:    { value: new THREE.Vector2(1, 1) },
+      uImageRes3:    { value: new THREE.Vector2(1, 1) },
+      uTime:         { value: 0 },
+      uLayerType:    { value: layerType },
+      uHover:        { value: 0 },
+      uMouse:        { value: new THREE.Vector2(0.5, 0.5) },
+      uBass:         { value: 0.0 },
+      uMid:          { value: 0.0 },
+      uHigh:         { value: 0.0 },
+      
+      // Liquid glass properties
+      uLens:         { value: new THREE.Vector4(0.5, 0.5, 0.14, 1.0) },
+      uMotion:       { value: new THREE.Vector4(0, 1, 0, 0) },
+      uMag:          { value: 1.15 },
+      uRefract:      { value: 0.35 },
+    }),
+    [layerType]
+  );
+
+  useFrame((state, delta) => {
+    if (!materialRef.current) return;
+    const mat = materialRef.current;
+    const mesh = meshRef.current;
+    if (!mesh) return;
+
+    // Update basic uniforms
+    mat.uniforms.uTime.value = state.clock.elapsedTime;
+    mat.uniforms.uResolution.value.set(state.size.width, state.size.height);
+
+    // ── Synthetic pulse drives uBass, uMid, uHigh ──
+    const pulse = updatePulse(delta, playbackState || null);
+    const bass = pulse * 0.8;
+    const mid = pulse * 0.3;
+    const high = pulse * 0.15;
+
+    // When imageBreathing is OFF, zero out the bass uniform so the shader's UV breathing stops
+    if (accessibility?.imageBreathing !== false) {
+      mat.uniforms.uBass.value = THREE.MathUtils.lerp(mat.uniforms.uBass.value, bass, 0.2);
+    } else {
+      mat.uniforms.uBass.value = THREE.MathUtils.lerp(mat.uniforms.uBass.value, 0, 0.15);
+    }
+    mat.uniforms.uMid.value = THREE.MathUtils.lerp(mat.uniforms.uMid.value, mid, 0.1);
+    mat.uniforms.uHigh.value = THREE.MathUtils.lerp(mat.uniforms.uHigh.value, high, 0.2);
+
+    // Assign textures and crossfade
+    mat.uniforms.uTexture1.value     = textures.texture1Ref.current ?? fallbackTex;
+    mat.uniforms.uTexture2.value     = textures.texture2Ref.current ?? fallbackTex;
+    mat.uniforms.uHoverTexture.value = textures.hoverTextureRef.current ?? fallbackTex;
+    mat.uniforms.uProgress.value     = textures.progress.value;
+    mat.uniforms.uImageRes1.value.copy(textures.imageRes1);
+    mat.uniforms.uImageRes2.value.copy(textures.imageRes2);
+    mat.uniforms.uImageRes3.value.copy(textures.imageRes3);
+    mat.uniforms.uHover.value        = textures.hoverAmount.value;
+
+    const t = state.clock.elapsedTime;
+
+    // Clamp delta to prevent physics engine explosions (NaN) during lag spikes, tab switching, or negative delta jitter
+    const dt = THREE.MathUtils.clamp(delta, 0.0001, 0.03);
+
+    // ── Spring-Follow Mouse Physics Simulation ──
+    let tx = mouseTarget.current.x;
+    let ty = mouseTarget.current.y;
+
+    // Safety guard: if mouse coordinates are NaN or infinite (e.g. if the canvas size was 0 during reflow),
+    // fall back to the current position to prevent the physics engine from collapsing.
+    if (isNaN(tx) || isNaN(ty) || !isFinite(tx) || !isFinite(ty)) {
+      tx = pxRef.current;
+      ty = pyRef.current;
+    }
+
+    const springK = 150.0;
+    const damping = 15.0;
+
+    const ax = (tx - pxRef.current) * springK;
+    const ay = (ty - pyRef.current) * springK;
+
+    vxRef.current += ax * dt;
+    vyRef.current += ay * dt;
+
+    vxRef.current = THREE.MathUtils.clamp(vxRef.current, -15.0, 15.0);
+    vyRef.current = THREE.MathUtils.clamp(vyRef.current, -15.0, 15.0);
+
+    const dampFactor = Math.exp(-damping * dt);
+    vxRef.current *= dampFactor;
+    vyRef.current *= dampFactor;
+
+    pxRef.current += vxRef.current * dt;
+    pyRef.current += vyRef.current * dt;
+
+    if (pxRef.current < -0.5) {
+      pxRef.current = -0.5;
+      vxRef.current = 0.0;
+    } else if (pxRef.current > 1.5) {
+      pxRef.current = 1.5;
+      vxRef.current = 0.0;
+    }
+
+    if (pyRef.current < -0.5) {
+      pyRef.current = -0.5;
+      vyRef.current = 0.0;
+    } else if (pyRef.current > 1.5) {
+      pyRef.current = 1.5;
+      vyRef.current = 0.0;
+    }
+
+    // ── Pre-Filter Pointer Events ──
+    smoothMouseRef.current.lerp(new THREE.Vector2(tx, ty), 8.0 * dt);
+
+    const lagDistance = Math.hypot(
+      tx - smoothMouseRef.current.x,
+      ty - smoothMouseRef.current.y
+    );
+
+    const targetStretch = Math.min(lagDistance * 3.0, 0.35);
+    stretchRef.current += (targetStretch - stretchRef.current) * (1.0 - Math.exp(-12.0 * dt));
+
+    const targetWobble = Math.min(lagDistance * 4.5, 0.6);
+    wobbleRef.current += (targetWobble - wobbleRef.current) * (1.0 - Math.exp(-8.0 * dt));
+
+    const springSpeed = Math.hypot(vxRef.current, vyRef.current);
+    if (springSpeed > 0.01) {
+      dirRef.current.set(vxRef.current / springSpeed, vyRef.current / springSpeed);
+    } else {
+      dirRef.current.lerp(new THREE.Vector2(0, 1), 5.0 * dt);
+    }
+
+    // Set liquid glass physics uniforms
+    mat.uniforms.uLens.value.set(pxRef.current, pyRef.current, 0.14, 1.0);
+    mat.uniforms.uMotion.value.set(dirRef.current.x, dirRef.current.y, stretchRef.current, wobbleRef.current);
+    mat.uniforms.uMouse.value.set(pxRef.current, pyRef.current);
+
+    // ── Silk drift animation ──
+    if (layerType === 0) {
+      mesh.position.x = Math.sin(t * 0.15) * 0.01;
+      mesh.position.y = Math.cos(t * 0.12) * 0.008;
+    } else if (layerType === 1) {
+      mesh.position.x = Math.sin(t * 0.2 + 1.5) * 0.035;
+      mesh.position.y = Math.cos(t * 0.18 + 0.7) * 0.025;
+    } else {
+      mesh.position.x = Math.sin(t * 0.25 + 3.0) * 0.05;
+      mesh.position.y = Math.cos(t * 0.22 + 2.1) * 0.04;
+    }
+
+    const parallaxStrength = 0.03 * (layerType + 1);
+    mesh.position.x += (mouseTarget.current.x - 0.5) * -parallaxStrength;
+    mesh.position.y += (mouseTarget.current.y - 0.5) * -parallaxStrength;
+
+    const transitionPeak = Math.sin(textures.progress.value * Math.PI);
+    const peelDistance = transitionPeak * 0.12 * (layerType + 1);
+    const peelAngle = (layerType * 2.094) + 0.5;
+    mesh.position.x += Math.cos(peelAngle) * peelDistance;
+    mesh.position.y += Math.sin(peelAngle) * peelDistance;
+
+    mesh.rotation.z = transitionPeak * 0.03 * (layerType === 1 ? 1 : -1);
+    mesh.scale.set(width * 1.05, height * 1.05, 1);
+  });
+
+  let blending: THREE.Blending = THREE.NormalBlending;
+  if (layerType === 1) blending = THREE.CustomBlending;
+  if (layerType === 2) blending = THREE.AdditiveBlending;
+
+  return (
+    <mesh ref={meshRef} position={[0, 0, zOffset]}>
+      <planeGeometry args={[1, 1]} />
+      <shaderMaterial
+        ref={materialRef}
+        vertexShader={vertexShader}
+        fragmentShader={fragmentShader}
+        uniforms={uniforms}
+        transparent
+        depthWrite={false}
+        blending={blending}
+        {...(layerType === 1 ? {
+          blendSrc: THREE.OneFactor,
+          blendDst: THREE.OneMinusSrcColorFactor,
+          blendSrcAlpha: THREE.OneFactor,
+          blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
+        } : {})}
+      />
+    </mesh>
+  );
+}
+
+// ──────────────────────────────────────────
 //  Main Scene Export
 // ──────────────────────────────────────────
 
@@ -484,13 +715,18 @@ export function ChillScene({
   textures,
   mouseTarget,
   hoverActive,
-  playbackState
+  playbackState,
+  accessibility,
+  boostValues,
 }: ChillSceneProps) {
   const { viewport } = useThree();
   const sparklesRef = useRef<THREE.Group>(null);
+  const hasLiveAudio = playbackState && (playbackState as any).getAudioData;
+
+  const PlaneComponent = hasLiveAudio ? ChillPlane : SyntheticChillPlane;
   
   useFrame((state, delta) => {
-    if (sparklesRef.current) {
+    if (sparklesRef.current && (accessibility?.sparkleEffects !== false)) {
       if (playbackState && (playbackState as any).getAudioData) {
         const data = (playbackState as any).getAudioData();
         if (data) {
@@ -529,9 +765,9 @@ export function ChillScene({
         </group>
       </Float>
 
-      <ChillPlane textures={textures} layerType={0} mouseTarget={mouseTarget} zOffset={0} playbackState={playbackState} />
-      <ChillPlane textures={textures} layerType={1} mouseTarget={mouseTarget} zOffset={0.01} playbackState={playbackState} />
-      <ChillPlane textures={textures} layerType={2} mouseTarget={mouseTarget} zOffset={0.02} playbackState={playbackState} />
+      <PlaneComponent textures={textures} layerType={0} mouseTarget={mouseTarget} zOffset={0} playbackState={playbackState} accessibility={accessibility} boostValues={boostValues} />
+      <PlaneComponent textures={textures} layerType={1} mouseTarget={mouseTarget} zOffset={0.01} playbackState={playbackState} accessibility={accessibility} boostValues={boostValues} />
+      <PlaneComponent textures={textures} layerType={2} mouseTarget={mouseTarget} zOffset={0.02} playbackState={playbackState} accessibility={accessibility} boostValues={boostValues} />
     </>
   );
 }

@@ -5,12 +5,15 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { TrackTextures } from "@/hooks/useTrackTextures";
 import { useSyntheticPulse, PlaybackState } from "@/hooks/useSyntheticPulse";
+import type { AccessibilitySettings } from "@/contexts/AccessibilityContext";
 
 interface EnergySceneProps {
   textures: TrackTextures;
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   hoverActive: boolean;
   playbackState?: PlaybackState | null;
+  boostValues: { bass: number; mids: number; highs: number };
+  accessibility?: AccessibilitySettings;
 }
 
 const fallbackTex = (() => {
@@ -103,13 +106,15 @@ interface KineticPlaneProps {
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   zOffset: number;
   playbackState?: PlaybackState | null;
+  boostValues: { bass: number; mids: number; highs: number };
+  accessibility?: AccessibilitySettings;
 }
 
 // ──────────────────────────────────────────
 // COMPONENT 1: Synthetic Kinetic Plane (Used for Spotify Mode)
 // ──────────────────────────────────────────
 
-function SyntheticKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState }: KineticPlaneProps) {
+function SyntheticKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState, accessibility, boostValues }: KineticPlaneProps) {
   const { width, height } = useThree((s) => s.viewport);
   const size = useThree((s) => s.size);
   const meshRef = useRef<THREE.Mesh>(null);
@@ -117,6 +122,7 @@ function SyntheticKineticPlane({ textures, layerType, mouseTarget, zOffset, play
 
   const mouseLerped = useRef(new THREE.Vector2(0.5, 0.5));
   const timeRef = useRef(Math.random() * 100);
+  const movementLerpRef = useRef(1.0);
   const { update: updatePulse } = useSyntheticPulse(120);
 
   const uniforms = useMemo(
@@ -149,20 +155,25 @@ function SyntheticKineticPlane({ textures, layerType, mouseTarget, zOffset, play
 
     mouseLerped.current.lerp(mouseTarget.current, 0.08);
 
+    // ── Movement Lerp ──
+    const targetMovement = (accessibility?.layerMovement !== false) ? 1.0 : 0.0;
+    movementLerpRef.current += (targetMovement - movementLerpRef.current) * 0.05;
+    const movement = movementLerpRef.current;
+
     let floatX = 0;
     let floatY = 0;
     if (layerType > 0) {
       const speed = 0.5;
       const radius = 0.02;
-      floatX = Math.sin(t * speed + layerType * 2.0) * radius;
-      floatY = Math.cos(t * speed * 1.2 + layerType * 2.0) * radius;
+      floatX = Math.sin(t * speed + layerType * 2.0) * radius * movement;
+      floatY = Math.cos(t * speed * 1.2 + layerType * 2.0) * radius * movement;
     }
 
     const transitionPeak = Math.sin(textures.progress.value * Math.PI);
     const pulse = updatePulse(delta, playbackState || null);
     const activePulse = (1.0 - transitionPeak) * pulse;
     
-    const explosionForce = 1.0 + (transitionPeak * 25.0) + (activePulse * 3.2 * layerType);
+    const explosionForce = 1.0 + (transitionPeak * 25.0 * movement) + (activePulse * 3.2 * layerType * movement);
 
     const parallaxX = (mouseLerped.current.x - 0.5) * -0.1 * layerType;
     const parallaxY = (mouseLerped.current.y - 0.5) * -0.1 * layerType;
@@ -171,10 +182,10 @@ function SyntheticKineticPlane({ textures, layerType, mouseTarget, zOffset, play
     mesh.position.y = (floatY * explosionForce) + parallaxY;
 
     mesh.rotation.z = (Math.sin(t * 2.0 + layerType) * 0.042) * explosionForce;
-    mesh.rotation.x = (parallaxY * 2.0) + (transitionPeak * (layerType % 2 === 0 ? 0.2 : -0.2));
-    mesh.rotation.y = (parallaxX * 2.0) + (transitionPeak * (layerType === 1 ? 0.2 : -0.2));
+    mesh.rotation.x = (parallaxY * 2.0) + (transitionPeak * (layerType % 2 === 0 ? 0.2 : -0.2) * movement);
+    mesh.rotation.y = (parallaxX * 2.0) + (transitionPeak * (layerType === 1 ? 0.2 : -0.2) * movement);
 
-    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType) + (activePulse * 0.042 * layerType);
+    const scalePulse = 1.0 + (transitionPeak * 0.15 * layerType * movement) + (activePulse * 0.042 * layerType * movement);
     mesh.scale.set(width * scalePulse, height * scalePulse, 1);
   });
 
@@ -198,7 +209,7 @@ function SyntheticKineticPlane({ textures, layerType, mouseTarget, zOffset, play
 // COMPONENT 2: Live Kinetic Plane (Used for Local MP3 Mode)
 // ──────────────────────────────────────────
 
-function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState }: KineticPlaneProps) {
+function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackState, accessibility, boostValues }: KineticPlaneProps) {
   const { width, height } = useThree((s) => s.viewport);
   const size = useThree((s) => s.size);
   const meshRef = useRef<THREE.Mesh>(null);
@@ -206,6 +217,7 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
 
   const mouseLerped = useRef(new THREE.Vector2(0.5, 0.5));
   const timeRef = useRef(Math.random() * 100);
+  const movementLerpRef = useRef(1.0);
 
   // Transient Kick Detector State
   const prevSubRef = useRef(0);
@@ -265,10 +277,10 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
     if (playbackState && (playbackState as any).getAudioData) {
       const data = (playbackState as any).getAudioData();
       if (data) {
-        currentSubBass = data.subBass;
-        currentBass = data.bass;
-        currentMid = data.mid;
-        currentImpact = data.impact;
+        currentSubBass = data.subBass * boostValues.bass;
+        currentBass = data.bass * boostValues.bass;
+        currentMid = data.mid * boostValues.mids;
+        currentImpact = data.impact * boostValues.highs;
       }
     }
 
@@ -306,17 +318,19 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
     // ── 4. Color Cycling (Highs) ──
 
     // Detect sharp hi-hat hit to cycle colors (with 300ms cooldown)
-    const now = performance.now();
-    if (currentImpact > 0.2 && prevImpactRef.current <= 0.2 && (now - lastCycleTimeRef.current) > 300) {
-      hiHatCountRef.current += 1;
-      lastCycleTimeRef.current = now;
+    if (accessibility?.colorSeparation !== false) {
+      const now = performance.now();
+      if (currentImpact > 0.2 && prevImpactRef.current <= 0.2 && (now - lastCycleTimeRef.current) > 300) {
+        hiHatCountRef.current += 1;
+        lastCycleTimeRef.current = now;
+      }
     }
     prevImpactRef.current = currentImpact;
 
     // Determine Z-Index & Top Layer
     let dynamicZ = zOffset;
     let isTopLayer = false;
-    if (layerType > 0) {
+    if (layerType > 0 && (accessibility?.colorSeparation !== false)) {
       const zIndex = ((layerType - 1 + hiHatCountRef.current) % 3) + 1; // 1, 2, or 3
       dynamicZ = zIndex * 0.01;
       isTopLayer = (zIndex === 3); // 3 is the top-most Z-index
@@ -327,6 +341,11 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
     topLayerLerpRef.current += (targetTop - topLayerLerpRef.current) * 0.15;
     const topLerp = topLayerLerpRef.current;
 
+    // ── Movement Lerp ──
+    const targetMovement = (accessibility?.layerMovement !== false) ? 1.0 : 0.0;
+    movementLerpRef.current += (targetMovement - movementLerpRef.current) * 0.05;
+    const movement = movementLerpRef.current;
+
     // ── Base Float (Circle) ──
     let floatX = 0;
     let floatY = 0;
@@ -334,13 +353,13 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
       const speed = 0.5;
       // Make the top layer orbit slightly wider so its color forms a visible halo (smoothly interpolated)
       const activeRadius = orbitalRadius * (1.0 + (topLerp * 1.5)); 
-      floatX = Math.sin(t * speed + layerType * 2.0) * activeRadius;
-      floatY = Math.cos(t * speed * 1.2 + layerType * 2.0) * activeRadius;
+      floatX = Math.sin(t * speed + layerType * 2.0) * activeRadius * movement;
+      floatY = Math.cos(t * speed * 1.2 + layerType * 2.0) * activeRadius * movement;
     }
 
     // ── Transition slam ──
     const transitionPeak = Math.sin(textures.progress.value * Math.PI);
-    const transitionForce = 1.0 + (transitionPeak * 25.0);
+    const transitionForce = 1.0 + (transitionPeak * 25.0 * movement);
 
     // Apply transition force to float
     floatX *= transitionForce;
@@ -348,7 +367,7 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
 
     // ── Decoupled Straight-Line Punch ──
     const punchAngle = layerType * ((Math.PI * 2) / 3); 
-    const punchForce = kickPulse * 0.12; 
+    const punchForce = kickPulse * 0.12 * movement; 
     let punchX = 0;
     let punchY = 0;
     if (layerType > 0) {
@@ -368,14 +387,14 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
     // Rotation
     const rotForce = transitionForce; // Removed kickPulse to stop chaotic twisting/shaking
     mesh.rotation.z = (Math.sin(t * 2.0 + layerType) * 0.042) * rotForce;
-    mesh.rotation.x = (parallaxY * 2.0) + (transitionPeak * (layerType % 2 === 0 ? 0.2 : -0.2));
-    mesh.rotation.y = (parallaxX * 2.0) + (transitionPeak * (layerType === 1 ? 0.2 : -0.2));
+    mesh.rotation.x = (parallaxY * 2.0) + (transitionPeak * (layerType % 2 === 0 ? 0.2 : -0.2) * movement);
+    mesh.rotation.y = (parallaxX * 2.0) + (transitionPeak * (layerType === 1 ? 0.2 : -0.2) * movement);
 
     // Scale
     const scalePulse = 1.0 
-      + (transitionPeak * 0.15 * layerType) 
-      + (bassBreath * 0.04 * layerType)
-      + (kickPulse * 0.02 * layerType)
+      + (transitionPeak * 0.15 * layerType * movement) 
+      + (bassBreath * 0.04 * layerType * movement)
+      + (kickPulse * 0.02 * layerType * movement)
       + (topLerp * 0.015); // Smoothly interpolated tiny scale boost
     mesh.scale.set(width * scalePulse, height * scalePulse, 1);
   });
@@ -408,17 +427,17 @@ export function EnergyScene(props: EnergySceneProps) {
     <>
       {hasLiveAudio ? (
         <>
-          <LiveKineticPlane textures={props.textures} layerType={0} mouseTarget={props.mouseTarget} zOffset={0} playbackState={props.playbackState} />
-          <LiveKineticPlane textures={props.textures} layerType={1} mouseTarget={props.mouseTarget} zOffset={0.01} playbackState={props.playbackState} />
-          <LiveKineticPlane textures={props.textures} layerType={2} mouseTarget={props.mouseTarget} zOffset={0.02} playbackState={props.playbackState} />
-          <LiveKineticPlane textures={props.textures} layerType={3} mouseTarget={props.mouseTarget} zOffset={0.03} playbackState={props.playbackState} />
+          <LiveKineticPlane textures={props.textures} layerType={0} mouseTarget={props.mouseTarget} zOffset={0} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
+          <LiveKineticPlane textures={props.textures} layerType={1} mouseTarget={props.mouseTarget} zOffset={0.01} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
+          <LiveKineticPlane textures={props.textures} layerType={2} mouseTarget={props.mouseTarget} zOffset={0.02} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
+          <LiveKineticPlane textures={props.textures} layerType={3} mouseTarget={props.mouseTarget} zOffset={0.03} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
         </>
       ) : (
         <>
-          <SyntheticKineticPlane textures={props.textures} layerType={0} mouseTarget={props.mouseTarget} zOffset={0} playbackState={props.playbackState} />
-          <SyntheticKineticPlane textures={props.textures} layerType={1} mouseTarget={props.mouseTarget} zOffset={0.01} playbackState={props.playbackState} />
-          <SyntheticKineticPlane textures={props.textures} layerType={2} mouseTarget={props.mouseTarget} zOffset={0.02} playbackState={props.playbackState} />
-          <SyntheticKineticPlane textures={props.textures} layerType={3} mouseTarget={props.mouseTarget} zOffset={0.03} playbackState={props.playbackState} />
+          <SyntheticKineticPlane textures={props.textures} layerType={0} mouseTarget={props.mouseTarget} zOffset={0} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
+          <SyntheticKineticPlane textures={props.textures} layerType={1} mouseTarget={props.mouseTarget} zOffset={0.01} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
+          <SyntheticKineticPlane textures={props.textures} layerType={2} mouseTarget={props.mouseTarget} zOffset={0.02} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
+          <SyntheticKineticPlane textures={props.textures} layerType={3} mouseTarget={props.mouseTarget} zOffset={0.03} playbackState={props.playbackState} accessibility={props.accessibility} boostValues={props.boostValues} />
         </>
       )}
     </>

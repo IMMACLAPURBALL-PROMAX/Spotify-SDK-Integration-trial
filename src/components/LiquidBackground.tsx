@@ -7,6 +7,7 @@ import { useTrackTextures } from "@/hooks/useTrackTextures";
 import { ChillScene } from "./moods/ChillScene";
 import { EnergyScene } from "./moods/EnergyScene";
 import { FocusScene } from "./moods/FocusScene";
+import type { AccessibilitySettings } from "@/contexts/AccessibilityContext";
 
 // ──────────────────────────────────────────
 //  R3F Scene Component Orchestrator
@@ -19,6 +20,8 @@ interface LiquidBackgroundSceneProps {
   mouseTarget: React.MutableRefObject<THREE.Vector2>;
   hoverActive: boolean;
   playbackState: any;
+  boostValues: { bass: number; mids: number; highs: number };
+  accessibility?: AccessibilitySettings;
 }
 
 function LiquidBackgroundScene({
@@ -28,6 +31,8 @@ function LiquidBackgroundScene({
   mouseTarget,
   hoverActive,
   playbackState,
+  boostValues,
+  accessibility,
 }: LiquidBackgroundSceneProps) {
   // Centralized texture loading and GSAP transition state
   const textures = useTrackTextures(currentTrackUrl, hoverTrackUrl, hoverActive);
@@ -35,13 +40,13 @@ function LiquidBackgroundScene({
   return (
     <>
       {mood === "chill" && (
-        <ChillScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} playbackState={playbackState} />
+        <ChillScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} playbackState={playbackState} boostValues={boostValues} accessibility={accessibility} />
       )}
       {mood === "energy" && (
-        <EnergyScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} playbackState={playbackState} />
+        <EnergyScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} playbackState={playbackState} boostValues={boostValues} accessibility={accessibility} />
       )}
       {mood === "focus" && (
-        <FocusScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} playbackState={playbackState} />
+        <FocusScene textures={textures} mouseTarget={mouseTarget} hoverActive={hoverActive} playbackState={playbackState} boostValues={boostValues} accessibility={accessibility} />
       )}
     </>
   );
@@ -56,6 +61,8 @@ interface LiquidBackgroundProps {
   hoverTrackUrl: string | null;
   mood: "chill" | "energy" | "focus";
   playbackState?: any;
+  boostValues: { bass: number; mids: number; highs: number };
+  accessibility?: AccessibilitySettings;
 }
 
 export function LiquidBackground({
@@ -63,6 +70,8 @@ export function LiquidBackground({
   hoverTrackUrl,
   mood,
   playbackState,
+  boostValues,
+  accessibility,
 }: LiquidBackgroundProps) {
   const mouseTarget = useRef(new THREE.Vector2(0.5, 0.5));
   const [hoverActive, setHoverActive] = useState(false);
@@ -111,6 +120,8 @@ export function LiquidBackground({
           mouseTarget={mouseTarget}
           hoverActive={hoverActive}
           playbackState={playbackState}
+          boostValues={boostValues}
+          accessibility={accessibility}
         />
       </Canvas>
     </div>
