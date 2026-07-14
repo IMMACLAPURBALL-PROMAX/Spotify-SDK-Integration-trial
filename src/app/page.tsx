@@ -235,6 +235,20 @@ export default function Home() {
       lastTrackIdRef.current = null;
       masterIndexRef.current = 0;
       setCurrentSlideIndex(0);
+      
+      // Clean up GSAP states so text doesn't stick
+      gsap.killTweensOf(".elem h1");
+      gsap.killTweensOf(".album-card");
+      document.querySelectorAll(".elem h1").forEach((h1, i) => {
+        gsap.set(h1, { clearProps: "all" });
+        if (i % 5 !== 0) h1.textContent = "";
+      });
+      document.querySelectorAll(".album-card").forEach((card, i) => {
+        gsap.set(card, { clearProps: "all" });
+        if (i === 0) card.classList.add("active");
+        else card.classList.remove("active");
+      });
+      animatingRef.current = false;
     } else {
       redirectToSpotifyLogin();
     }
@@ -370,7 +384,7 @@ export default function Home() {
             </div>
             
             <div id="hero" className={brightness.heroIsLight ? "force-black" : ""}>
-              <div id="heroleft">
+              <div id="heroleft" key={isLoggedIn ? "spotify" : "local"}>
                 {/* Column 1: Song name */}
                 <div className="elem">
                   <h1>{isPlayerActive ? (playerState.currentTrack?.name || "Loading...") : "Loading..."}</h1>
@@ -403,6 +417,7 @@ export default function Home() {
                 </button>
               </div>
               <PlayerCard 
+                key={isLoggedIn ? "spotify" : "local"}
                 playerState={playerState}
                 controls={controls}
                 isPlayerActive={isPlayerActive}

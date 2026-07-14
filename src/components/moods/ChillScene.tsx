@@ -733,16 +733,24 @@ export function ChillScene({
           // Remove the scale 'zooming' (which causes the back-and-forth effect)
           sparklesRef.current.scale.setScalar(1.0);
           
+          // Multiply by highs boost value from the synthesizer
+          const boostedImpact = data.impact * boostValues.highs;
+          
           // Instead of teleporting them randomly (which creates TV static / persistence of vision),
           // use a high-speed sine wave so they smoothly but violently oscillate back and forth.
-          // The distance MUST be microscopic (0.015) so we don't accidentally scramble the noise texture!
-          if (data.impact > 0.1) {
+          // We increased the amplitude and added a subtle scale pulse so it's visually apparent.
+          if (boostedImpact > 0.1) {
             const time = state.clock.elapsedTime;
-            sparklesRef.current.position.x = Math.sin(time * 50.0) * data.impact * 0.015;
-            sparklesRef.current.position.y = Math.cos(time * 45.0) * data.impact * 0.015;
+            sparklesRef.current.position.x = Math.sin(time * 50.0) * boostedImpact * 0.08;
+            sparklesRef.current.position.y = Math.cos(time * 45.0) * boostedImpact * 0.08;
+            
+            // Add a subtle scale pulse to make the beat hit harder
+            const scalePulse = 1.0 + (boostedImpact * 0.15);
+            sparklesRef.current.scale.setScalar(scalePulse);
           } else {
-            // Smoothly settle back to origin
+            // Smoothly settle back to origin and base scale
             sparklesRef.current.position.lerp(new THREE.Vector3(0, 0, 1), 0.1);
+            sparklesRef.current.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
           }
         }
       }

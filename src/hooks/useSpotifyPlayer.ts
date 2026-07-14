@@ -73,7 +73,7 @@ function loadSpotifySDKScript(): Promise<void> {
   });
 }
 
-export function useSpotifyPlayer(): {
+export function useSpotifyPlayer(isActive: boolean): {
   state: SpotifyPlayerState;
   controls: SpotifyPlayerControls;
 } {
@@ -108,6 +108,18 @@ export function useSpotifyPlayer(): {
   );
 
   useEffect(() => {
+    if (!isActive) {
+      if (playerRef.current) {
+        // Pause first so music stops playing on their account
+        playerRef.current.pause().finally(() => {
+          playerRef.current?.disconnect();
+          playerRef.current = null;
+          setState(prev => ({ ...prev, isReady: false, currentTrack: null }));
+        });
+      }
+      return;
+    }
+
     const token = getStoredAccessToken();
     if (!token) return; // Not logged in — don't initialize
 
@@ -217,7 +229,7 @@ export function useSpotifyPlayer(): {
         playerRef.current = null;
       }
     };
-  }, [extractTrackInfo]);
+  }, [isActive, extractTrackInfo]);
 
   // ── Controls ──
   const skipToNext = useCallback(async () => {

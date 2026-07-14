@@ -320,7 +320,9 @@ function LiveKineticPlane({ textures, layerType, mouseTarget, zOffset, playbackS
     // Detect sharp hi-hat hit to cycle colors (with 300ms cooldown)
     if (accessibility?.colorSeparation !== false) {
       const now = performance.now();
-      if (currentImpact > 0.2 && prevImpactRef.current <= 0.2 && (now - lastCycleTimeRef.current) > 300) {
+      const deltaImpact = currentImpact - prevImpactRef.current;
+      // Trigger if there is a sharp increase and it's above a baseline threshold
+      if (currentImpact > (0.2 / boostValues.highs) && deltaImpact > 0.02 && (now - lastCycleTimeRef.current) > 300) {
         hiHatCountRef.current += 1;
         lastCycleTimeRef.current = now;
       }

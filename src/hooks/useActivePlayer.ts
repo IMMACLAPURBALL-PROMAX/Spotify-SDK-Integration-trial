@@ -13,7 +13,7 @@ export function useActivePlayer(
   isLocal: boolean;
   getAudioData?: () => AudioReactivityData | null;
 } {
-  const spotify = useSpotifyPlayer();
+  const spotify = useSpotifyPlayer(isLoggedIn);
   const local = useLocalPlayer(mood, !isLoggedIn);
 
   if (isLoggedIn) {
