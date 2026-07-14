@@ -384,7 +384,7 @@ export default function Home() {
             </div>
             
             <div id="hero" className={brightness.heroIsLight ? "force-black" : ""}>
-              <div id="heroleft" key={isLoggedIn ? "spotify" : "local"}>
+              <div id="heroleft">
                 {/* Column 1: Song name */}
                 <div className="elem">
                   <h1>{isPlayerActive ? (playerState.currentTrack?.name || "Loading...") : "Loading..."}</h1>
@@ -417,7 +417,6 @@ export default function Home() {
                 </button>
               </div>
               <PlayerCard 
-                key={isLoggedIn ? "spotify" : "local"}
                 playerState={playerState}
                 controls={controls}
                 isPlayerActive={isPlayerActive}
