@@ -303,21 +303,27 @@ body, html {
 
 #heroleft {
     flex: 1;
+    min-width: 0; /* Prevents flex child from expanding beyond parent, allowing text-overflow ellipsis to trigger */
 }
 
 #heroleft .elem {
     position: relative;
-    /* Base height for first element */
-    height: 7.5vw; 
+    /* Exact height to match 7vw * 0.9 line-height */
+    height: 6.3vw; 
+    margin-bottom: 0.8vw; /* Consistent vertical gap */
     overflow: hidden;
 }
 
 /* Adjust wrapper heights for smaller elements */
 #heroleft .elem:nth-child(2) {
-    height: 5.5vw;
+    height: 4.5vw; /* 5vw * 0.9 */
+    margin-top: 0;
+    margin-bottom: 0.8vw; /* Consistent vertical gap */
 }
 #heroleft .elem:nth-child(3) {
-    height: 4vw;
+    height: 3.15vw; /* 3.5vw * 0.9 */
+    margin-top: 0;
+    margin-bottom: 0;
 }
 
 #heroleft .elem h1 {
@@ -334,12 +340,17 @@ body, html {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 90vw;
+    max-width: 100%; /* Constrain to the column width so it doesn't bleed under the player card */
     transition: color 0.3s ease;
+}
+
+#heroleft .elem:nth-child(1) h1 {
+    margin-left: -0.4vw; /* Optical typography alignment to counteract font left-bearing at 7vw */
 }
 
 #heroleft .elem:nth-child(2) h1 {
     font-size: 5vw;
+    margin-left: -0.15vw; /* Optical alignment for 5vw */
 }
 
 #heroleft .elem:nth-child(3) h1 {
@@ -1098,6 +1109,7 @@ body, html {
     border: none;
     cursor: pointer;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    margin-top: -5px; /* centers the thumb vertically on the 4px track */
 }
 
 .boost-slider-row input[type="range"]::-moz-range-thumb {
@@ -1190,7 +1202,7 @@ body, html {
 }
 
 .a11y-panel-header {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 2px;
@@ -1219,13 +1231,13 @@ body, html {
 }
 
 .a11y-toggle-label {
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 600;
     color: #fff;
 }
 
 .a11y-toggle-desc {
-    font-size: 11px;
+    font-size: 13px;
     color: rgba(255, 255, 255, 0.5);
 }
 

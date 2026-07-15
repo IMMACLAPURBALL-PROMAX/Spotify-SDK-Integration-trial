@@ -117,14 +117,13 @@ export const LOCAL_PLAYLISTS = {
     }
   ],
   focus: [
-    // Fallback tracks for Focus until you upload specific Focus tracks
     {
       id: "local-focus-1",
       name: "bury a friend",
       primaryArtist: "Billie Eilish",
       featuredArtists: [],
-      albumName: "WHEN WE ALL FALL ASLEEP",
-      albumArtUrl: "/images/cover4.jpg",
+      albumName: "WHEN WE ALL FALL ASLEEP, WHERE DO WE GO?",
+      albumArtUrl: "/images/billie_2.jpg",
       audioUrl: "/audio/billie-eilish-bury-a-friend.mp3",
     },
     {
@@ -135,6 +134,15 @@ export const LOCAL_PLAYLISTS = {
       albumName: "dont smile at me",
       albumArtUrl: "/images/cover3.jpg",
       audioUrl: "/audio/billie-eilish-dont-smile-at-me.mp3",
+    },
+    {
+      id: "local-focus-3",
+      name: "LUNCH",
+      primaryArtist: "Billie Eilish",
+      featuredArtists: [],
+      albumName: "HIT ME HARD AND SOFT",
+      albumArtUrl: "/images/cover2.jpg",
+      audioUrl: "/audio/billie-eilish-lunch.mp3",
     }
   ]
 };
