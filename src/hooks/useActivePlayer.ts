@@ -2,7 +2,7 @@
 
 import { useSpotifyPlayer } from "./useSpotifyPlayer";
 import { useLocalPlayer, AudioReactivityData } from "./useLocalPlayer";
-import { useArchetypeSynthesizer } from "./useArchetypeSynthesizer";
+import { useAudioSynthesizer } from "./useAudioSynthesizer";
 import type { SpotifyPlayerState, SpotifyPlayerControls } from "./useSpotifyPlayer";
 import { useCallback } from "react";
 
@@ -19,7 +19,7 @@ export function useActivePlayer(
   const local = useLocalPlayer(mood, !isLoggedIn);
 
   // Generate simulated audio data for Spotify
-  const synthData = useArchetypeSynthesizer({
+  const synthData = useAudioSynthesizer({
     isPlaying: isLoggedIn && !spotify.state.isPaused,
     progressMs: spotify.state.positionMs,
   });

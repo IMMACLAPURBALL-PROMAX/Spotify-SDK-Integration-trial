@@ -5,24 +5,24 @@ export interface SynthesizedAudioData {
   bass: number;
   mid: number;
   high: number;
-  impact: boolean;
+  impact: number;
 }
 
-interface UseArchetypeSynthesizerProps {
+interface UseAudioSynthesizerProps {
   isPlaying: boolean;
   progressMs?: number; 
 }
 
-export function useArchetypeSynthesizer({
+export function useAudioSynthesizer({
   isPlaying,
   progressMs = 0,
-}: UseArchetypeSynthesizerProps): SynthesizedAudioData {
+}: UseAudioSynthesizerProps): SynthesizedAudioData {
   const [audioData, setAudioData] = useState<SynthesizedAudioData>({
     subBass: 0,
     bass: 0,
     mid: 0,
     high: 0,
-    impact: false,
+    impact: 0,
   });
 
   const requestRef = useRef<number>(0);
@@ -31,7 +31,7 @@ export function useArchetypeSynthesizer({
 
   useEffect(() => {
     if (!isPlaying) {
-      setAudioData({ subBass: 0, bass: 0, mid: 0, high: 0, impact: false });
+      setAudioData({ subBass: 0, bass: 0, mid: 0, high: 0, impact: 0 });
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current);
       }
@@ -72,7 +72,7 @@ export function useArchetypeSynthesizer({
         bass: Math.min(1, Math.max(0, jitter(bass))),
         mid: Math.min(1, Math.max(0, jitter(mid))),
         high: Math.min(1, Math.max(0, jitter(high))),
-        impact: isImpact,
+        impact: isImpact ? 1 : 0,
       });
 
       requestRef.current = requestAnimationFrame(animate);
