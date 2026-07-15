@@ -3,6 +3,7 @@
 import { useSpotifyPlayer } from "./useSpotifyPlayer";
 import { useLocalPlayer, AudioReactivityData } from "./useLocalPlayer";
 import { useAudioSynthesizer } from "./useAudioSynthesizer";
+import { useChillSynthesizer } from "./useChillSynthesizer";
 import type { SpotifyPlayerState, SpotifyPlayerControls } from "./useSpotifyPlayer";
 import { useCallback } from "react";
 
@@ -18,13 +19,20 @@ export function useActivePlayer(
   const spotify = useSpotifyPlayer(isLoggedIn);
   const local = useLocalPlayer(mood, !isLoggedIn);
 
-  // Generate simulated audio data for Spotify
-  const synthData = useAudioSynthesizer({
-    isPlaying: isLoggedIn && !spotify.state.isPaused,
+  // Run the standard heavy synth only for Energy/Focus
+  const baseSynthData = useAudioSynthesizer({
+    isPlaying: isLoggedIn && !spotify.state.isPaused && mood !== "chill",
     progressMs: spotify.state.positionMs,
   });
 
-  const getSpotifyAudioData = useCallback(() => synthData, [synthData]);
+  // Run the sparse, random synth only for Chill
+  const chillSynthData = useChillSynthesizer({
+    isPlaying: isLoggedIn && !spotify.state.isPaused && mood === "chill",
+  });
+
+  // Dynamically pass the correct audio data to the visualizers
+  const activeSynthData = mood === "chill" ? chillSynthData : baseSynthData;
+  const getSpotifyAudioData = useCallback(() => activeSynthData, [activeSynthData]);
 
   if (isLoggedIn) {
     return {
