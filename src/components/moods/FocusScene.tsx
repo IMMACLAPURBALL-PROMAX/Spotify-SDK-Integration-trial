@@ -200,7 +200,7 @@ function GeometricFrame({
     return geo;
   }, []);
 
-  useFrame(() => {
+  useFrame((state) => {
     const line = lineRef.current;
     if (!line) return;
 
@@ -214,10 +214,17 @@ function GeometricFrame({
 
     // Smooth the bass for a gentle breath
     smoothBassRef.current += (bassValue - smoothBassRef.current) * 0.06;
-    const breath = (reactive && accessibility?.frameBreathing !== false) ? smoothBassRef.current * 0.015 : 0;
+    const audioBreath = (reactive && accessibility?.frameBreathing !== false) ? smoothBassRef.current * 0.015 : 0;
 
-    const sx = width * scale + breath;
-    const sy = height * scale + breath;
+    // Brushed up wave interference math for gentle, organic morphing
+    const time = state.clock.elapsedTime * 1000;
+    const waveX = Math.sin(time / 2300) * 0.5 + 0.5; // 0 to 1
+    const waveY = Math.sin(time / 3700) * 0.5 + 0.5; // 0 to 1
+    const waveBreathX = (reactive && accessibility?.frameBreathing !== false) ? waveX * 0.02 : 0;
+    const waveBreathY = (reactive && accessibility?.frameBreathing !== false) ? waveY * 0.02 : 0;
+
+    const sx = width * scale + audioBreath + waveBreathX;
+    const sy = height * scale + audioBreath + waveBreathY;
     line.scale.set(sx, sy, 1);
   });
 
@@ -269,7 +276,7 @@ function SyntheticGeometricFrame({
     return geo;
   }, []);
 
-  useFrame((_state, delta) => {
+  useFrame((state, delta) => {
     const line = lineRef.current;
     if (!line) return;
 
@@ -281,10 +288,17 @@ function SyntheticGeometricFrame({
 
     // Smooth the bass for a gentle breath
     smoothBassRef.current += (bassValue - smoothBassRef.current) * 0.06;
-    const breath = (reactive && accessibility?.frameBreathing !== false) ? smoothBassRef.current * 0.015 : 0;
+    const audioBreath = (reactive && accessibility?.frameBreathing !== false) ? smoothBassRef.current * 0.015 : 0;
 
-    const sx = width * scale + breath;
-    const sy = height * scale + breath;
+    // Brushed up wave interference math for gentle, organic morphing
+    const time = state.clock.elapsedTime * 1000;
+    const waveX = Math.sin(time / 2300) * 0.5 + 0.5; // 0 to 1
+    const waveY = Math.sin(time / 3700) * 0.5 + 0.5; // 0 to 1
+    const waveBreathX = (reactive && accessibility?.frameBreathing !== false) ? waveX * 0.02 : 0;
+    const waveBreathY = (reactive && accessibility?.frameBreathing !== false) ? waveY * 0.02 : 0;
+
+    const sx = width * scale + audioBreath + waveBreathX;
+    const sy = height * scale + audioBreath + waveBreathY;
     line.scale.set(sx, sy, 1);
   });
 

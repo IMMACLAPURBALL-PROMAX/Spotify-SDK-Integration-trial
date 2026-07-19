@@ -19,6 +19,8 @@ export function useChillSynthesizer({
   const requestRef = useRef<number>(0);
   const lastTriggerMsRef = useRef<number>(0);
   const nextTriggerMsRef = useRef<number>(0);
+  const lastBassTriggerMsRef = useRef<number>(0);
+  const nextBassTriggerMsRef = useRef<number>(0);
 
   useEffect(() => {
     if (!isPlaying) {
@@ -32,21 +34,29 @@ export function useChillSynthesizer({
     const animate = (time: number) => {
       let isImpact = false;
       
-      // Initialize timer on first frame
+      // Initialize timers on first frame
       if (nextTriggerMsRef.current === 0) {
         nextTriggerMsRef.current = time + 500;
+        nextBassTriggerMsRef.current = time + 2000;
       }
 
+      // Sparkles Timer (0.5s - 1.5s)
       if (time >= nextTriggerMsRef.current) {
         isImpact = true;
         lastTriggerMsRef.current = time;
-        // User specification: Minimum delay 500ms + Random(0-1000ms)
         nextTriggerMsRef.current = time + 500 + Math.random() * 1000;
       }
 
+      // Independent Sub-Bass Timer (2.0s - 4.0s)
+      if (time >= nextBassTriggerMsRef.current) {
+        lastBassTriggerMsRef.current = time;
+        nextBassTriggerMsRef.current = time + 2000 + Math.random() * 2000;
+      }
+
       const timeSinceTrigger = time - lastTriggerMsRef.current;
+      const timeSinceBassTrigger = time - lastBassTriggerMsRef.current;
       
-      // Hold high for 50ms, decay over 400ms for a snappy sparkle trigger
+      // Sparkle Decay
       let pulseDecay = 0;
       if (timeSinceTrigger < 50) {
         pulseDecay = 1.0;
@@ -54,12 +64,23 @@ export function useChillSynthesizer({
         pulseDecay = 1.0 - (timeSinceTrigger - 50) / 400.0;
       }
 
-      // Strong spike for sparkles during impact
+      // Sub-Bass Decay (heavy punch that fades out over 600ms)
+      let bassPulseDecay = 0;
+      if (timeSinceBassTrigger < 50) {
+        bassPulseDecay = 1.0;
+      } else if (timeSinceBassTrigger < 650) {
+        bassPulseDecay = 1.0 - (timeSinceBassTrigger - 50) / 600.0;
+      }
+
+      // Strong spike for sparkles
       const high = pulseDecay * 1.5; 
-      
-      // Severely dampened bass to prevent the constant image pulsing
-      const subBass = 0.05;
-      const bass = 0.05;
+
+      // Massive sub-bass punch on its own independent timer!
+      const subBass = 0.05 + bassPulseDecay * 0.9; 
+
+      // Gentle, slow breathing for the normal bass (completes a full breath cycle every ~10 seconds)
+      const slowBreath = Math.sin(time / 1500) * 0.5 + 0.5;
+      const bass = 0.15 + slowBreath * 0.2;
       // Gentle subtle warmth for the mid ranges
       const mid = 0.4 + (isImpact ? 0.2 : 0);
 
